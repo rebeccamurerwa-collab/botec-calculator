@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BOTEC Tool — Sign in</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="auth-page">
+  <div class="auth-container">
+    <div class="auth-brand">
+      <div class="brand-mark">B</div>
+      <h1>BOTEC Calculator</h1>
+      <p>Back-of-the-envelope cost-per-beneficiary estimates</p>
+    </div>
+
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchAuthTab('login')">Sign in</button>
+        <button class="auth-tab" onclick="switchAuthTab('signup')">Create account</button>
+      </div>
+
+      <!-- Login -->
+      <div id="login-form">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="login-email" placeholder="you@organisation.org" autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div id="login-error" class="form-error hidden"></div>
+        <button class="btn-primary full-width" onclick="handleLogin()">Sign in</button>
+        <button class="btn-link" onclick="handleForgotPassword()">Forgot password?</button>
+      </div>
+
+      <!-- Signup -->
+      <div id="signup-form" class="hidden">
+        <div class="field">
+          <label>Full name</label>
+          <input type="text" id="signup-name" placeholder="Your name">
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="signup-email" placeholder="you@organisation.org" autocomplete="email">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="signup-password" placeholder="Minimum 8 characters" autocomplete="new-password">
+        </div>
+        <div id="signup-error" class="form-error hidden"></div>
+        <div id="signup-success" class="form-success hidden"></div>
+        <button class="btn-primary full-width" onclick="handleSignup()">Create account</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    // If already logged in, go to dashboard
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) window.location.href = 'index.html';
+    });
+
+    function switchAuthTab(tab) {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('signup-form').classList.toggle('hidden', tab !== 'signup');
+    }
+
+    async function handleLogin() {
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+      const btn = event.target;
+      btn.textContent = 'Signing in…'; btn.disabled = true;
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        errEl.textContent = error.message; errEl.classList.remove('hidden');
+        btn.textContent = 'Sign in'; btn.disabled = false;
+      } else {
+        window.location.href = 'index.html';
+      }
+    }
+
+    async function handleSignup() {
+      const name = document.getElementById('signup-name').value.trim();
+      const email = document.getElementById('signup-email').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const errEl = document.getElementById('signup-error');
+      const okEl = document.getElementById('signup-success');
+      errEl.classList.add('hidden'); okEl.classList.add('hidden');
+      const btn = event.target;
+      btn.textContent = 'Creating…'; btn.disabled = true;
+      const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: name } } });
+      if (error) {
+        errEl.textContent = error.message; errEl.classList.remove('hidden');
+        btn.textContent = 'Create account'; btn.disabled = false;
+      } else {
+        okEl.textContent = 'Account created! Check your email to confirm, then sign in.';
+        okEl.classList.remove('hidden');
+        btn.textContent = 'Create account'; btn.disabled = false;
+      }
+    }
+
+    async function handleForgotPassword() {
+      const email = document.getElementById('login-email').value.trim();
+      if (!email) { alert('Enter your email address first.'); return; }
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/login.html' });
+      if (error) alert('Error: ' + error.message);
+      else alert('Password reset email sent. Check your inbox.');
+    }
+
+    // Enter key support
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        if (!document.getElementById('signup-form').classList.contains('hidden')) handleSignup();
+        else handleLogin();
+      }
+    });
+  </script>
+</body>
+</html>

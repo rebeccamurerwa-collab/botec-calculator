@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BOTEC Tool — Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">
+      <div class="brand-mark">B</div>
+      <span>BOTEC Calculator</span>
+    </div>
+    <div class="nav-right">
+      <span id="nav-user" class="nav-user"></span>
+      <button class="btn-ghost" onclick="handleSignOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <main class="dashboard-main">
+    <div class="dashboard-header">
+      <div>
+        <h2>Your BOTEC documents</h2>
+        <p class="muted">Back-of-the-envelope cost-per-beneficiary estimates</p>
+      </div>
+      <button class="btn-primary" onclick="newDocument()">+ New BOTEC</button>
+    </div>
+
+    <div id="docs-loading" class="loading-state">
+      <div class="spinner"></div>
+      <span>Loading documents…</span>
+    </div>
+
+    <div id="docs-empty" class="empty-state hidden">
+      <div class="empty-icon">📋</div>
+      <h3>No documents yet</h3>
+      <p>Create your first BOTEC estimate to get started.</p>
+      <button class="btn-primary" onclick="newDocument()">Create BOTEC</button>
+    </div>
+
+    <div id="docs-grid" class="docs-grid hidden"></div>
+  </main>
+
+  <!-- Delete confirm modal -->
+  <div id="delete-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <h3>Delete document?</h3>
+      <p>This will permanently delete <strong id="delete-doc-name"></strong>. This cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    let currentUser = null;
+    let deleteTargetId = null;
+
+    async function init() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.href = 'login.html'; return; }
+      currentUser = session.user;
+      document.getElementById('nav-user').textContent = currentUser.user_metadata?.full_name || currentUser.email;
+      loadDocuments();
+    }
+
+    async function loadDocuments() {
+      const { data, error } = await sb
+        .from('botec_documents')
+        .select('id, name, programme, created_at, updated_at, data')
+        .order('updated_at', { ascending: false });
+
+      document.getElementById('docs-loading').classList.add('hidden');
+
+      if (error) { alert('Failed to load documents: ' + error.message); return; }
+
+      if (!data || data.length === 0) {
+        document.getElementById('docs-empty').classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('docs-grid').classList.remove('hidden');
+      document.getElementById('docs-grid').innerHTML = data.map(doc => {
+        const cpb = doc.data?.cpbAvg != null ? `₹${parseFloat(doc.data.cpbAvg).toFixed(2)}` : '—';
+        const totalBen = doc.data?.totalBen != null ? parseInt(doc.data.totalBen).toLocaleString() : '—';
+        const updated = new Date(doc.updated_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+        return `
+          <div class="doc-card" onclick="openDocument('${doc.id}')">
+            <div class="doc-card-header">
+              <div class="doc-icon">B</div>
+              <div class="doc-meta">
+                <span class="doc-updated">Updated ${updated}</span>
+                ${doc.programme ? `<span class="doc-programme">${doc.programme}</span>` : ''}
+              </div>
+            </div>
+            <h3 class="doc-name">${doc.name}</h3>
+            <div class="doc-stats">
+              <div class="doc-stat"><span class="stat-label">CPB (avg)</span><span class="stat-val">${cpb}</span></div>
+              <div class="doc-stat"><span class="stat-label">Beneficiaries</span><span class="stat-val">${totalBen}</span></div>
+            </div>
+            <div class="doc-actions" onclick="event.stopPropagation()">
+              <button class="btn-ghost btn-sm" onclick="openDocument('${doc.id}')">Open</button>
+              <button class="btn-ghost btn-sm" onclick="duplicateDocument('${doc.id}', '${doc.name.replace(/'/g,"\\'")}')">Duplicate</button>
+              <button class="btn-ghost btn-sm danger" onclick="promptDelete('${doc.id}', '${doc.name.replace(/'/g,"\\'")}')">Delete</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function newDocument() {
+      window.location.href = 'calculator.html';
+    }
+
+    function openDocument(id) {
+      window.location.href = `calculator.html?id=${id}`;
+    }
+
+    async function duplicateDocument(id, name) {
+      const { data, error } = await sb.from('botec_documents').select('*').eq('id', id).single();
+      if (error) { alert('Error: ' + error.message); return; }
+      const { error: insertErr } = await sb.from('botec_documents').insert({
+        user_id: currentUser.id,
+        name: 'Copy of ' + data.name,
+        programme: data.programme,
+        data: data.data
+      });
+      if (insertErr) alert('Error duplicating: ' + insertErr.message);
+      else loadDocuments();
+    }
+
+    function promptDelete(id, name) {
+      deleteTargetId = id;
+      document.getElementById('delete-doc-name').textContent = name;
+      document.getElementById('delete-modal').classList.remove('hidden');
+    }
+    function closeDeleteModal() {
+      deleteTargetId = null;
+      document.getElementById('delete-modal').classList.add('hidden');
+    }
+    async function confirmDelete() {
+      if (!deleteTargetId) return;
+      const { error } = await sb.from('botec_documents').delete().eq('id', deleteTargetId);
+      closeDeleteModal();
+      if (error) alert('Error deleting: ' + error.message);
+      else loadDocuments();
+    }
+
+    async function handleSignOut() {
+      await sb.auth.signOut();
+      window.location.href = 'login.html';
+    }
+
+    init();
+  </script>
+</body>
+</html>

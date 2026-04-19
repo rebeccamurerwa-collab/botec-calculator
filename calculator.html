@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BOTEC Calculator</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">
+      <a href="index.html" class="nav-back">← Dashboard</a>
+    </div>
+    <div class="nav-centre">
+      <input type="text" id="doc-title" class="doc-title-input" placeholder="Untitled BOTEC" value="Untitled BOTEC">
+    </div>
+    <div class="nav-right">
+      <span id="save-status" class="save-status">Unsaved</span>
+      <button class="btn-primary" onclick="saveDocument()">Save</button>
+    </div>
+  </nav>
+
+  <main class="calc-main">
+    <div class="calc-card">
+      <div class="tabs">
+        <button class="tab on" onclick="go('setup')">1. Project</button>
+        <button class="tab" onclick="go('ben')">2. Beneficiaries</button>
+        <button class="tab" onclick="go('costs')">3. Cost items</button>
+        <button class="tab" onclick="go('results')">4. Results &amp; export</button>
+      </div>
+
+      <!-- SETUP -->
+      <div id="p-setup" class="pane on">
+        <div class="stitle">Project information</div>
+        <div class="frow f2">
+          <div class="field"><label>Project name</label><input type="text" id="projName" value=""></div>
+          <div class="field"><label>Programme / state</label><input type="text" id="programme" value=""></div>
+        </div>
+        <div class="frow f4">
+          <div class="field"><label>Prepared by</label><input type="text" id="prepBy"></div>
+          <div class="field"><label>Preparation date</label><input type="text" id="prepDate"></div>
+          <div class="field"><label>Reviewed by</label><input type="text" id="reviewBy"></div>
+          <div class="field"><label>Review date</label><input type="text" id="reviewDate"></div>
+        </div>
+        <div class="frow f2">
+          <div class="field"><label>Currency</label>
+            <select id="currency" onchange="calcAll()">
+              <option value="INR">INR (₹)</option><option value="USD">USD ($)</option>
+              <option value="GBP">GBP (£)</option><option value="EUR">EUR (€)</option>
+            </select>
+          </div>
+          <div class="field"><label>Number of project years</label>
+            <select id="numYears" onchange="calcAll()">
+              <option value="3" selected>3 years</option><option value="2">2 years</option><option value="1">1 year</option>
+            </select>
+          </div>
+        </div>
+        <div class="frow f2">
+          <div class="field"><label>Buffer / contingency % <span class="ftag">applied to all sub-costs</span></label>
+            <input type="number" id="bufferPct" value="15" min="0" max="100" oninput="calcAll()">
+          </div>
+          <div class="field"><label>Managerial cost multiplier % <span class="ftag">% of Internal Consulting</span></label>
+            <input type="number" id="mgrMult" value="25" min="0" max="100" oninput="calcAll()">
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>Purpose / notes</label>
+          <textarea id="purposeNote" rows="3"></textarea>
+        </div>
+        <div style="margin-top:14px">
+          <div class="stitle" style="margin-bottom:6px">Logistics cost heads <span class="ftag">used for CPB-excluding-logistics row</span></div>
+          <div id="logFlags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+      </div>
+
+      <!-- BENEFICIARIES -->
+      <div id="p-ben" class="pane">
+        <div class="stitle">Beneficiary calculation</div>
+        <div class="note">Break the estimate into hierarchical units — e.g. Districts → Schools per District → Students per School. Total Beneficiaries = product of all rows per year.</div>
+        <table class="tbl" id="benTbl">
+          <thead>
+            <tr>
+              <th style="min-width:200px">Template label</th>
+              <th style="min-width:150px">Unit name <span class="ftag">rename</span></th>
+              <th style="min-width:170px">Notes / source</th>
+              <th style="width:90px">Year 1</th>
+              <th style="width:90px">Year 2</th>
+              <th style="width:90px">Year 3</th>
+              <th style="width:28px"></th>
+            </tr>
+          </thead>
+          <tbody id="benBody"></tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="3" style="font-weight:500">Total Beneficiaries <span class="ftag">= product of rows above</span></td>
+              <td style="text-align:right" id="tot1">—</td>
+              <td style="text-align:right" id="tot2">—</td>
+              <td style="text-align:right" id="tot3">—</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+        <button class="addbtn" onclick="addBen()">+ Add row</button>
+        <div id="benExplain" class="note" style="margin-top:10px;margin-bottom:0"></div>
+      </div>
+
+      <!-- COSTS -->
+      <div id="p-costs" class="pane">
+        <div class="stitle">Cost line items</div>
+        <div class="note">Cost [Yr] = Cost/unit × Units [Yr]. Managerial multiplier and buffer are added automatically in the summary.</div>
+        <div style="overflow-x:auto">
+          <table class="tbl" id="costTbl">
+            <thead><tr>
+              <th style="min-width:155px">Cost head</th>
+              <th style="min-width:165px">Description</th>
+              <th style="min-width:100px">Unit label</th>
+              <th style="width:100px">Cost/unit</th>
+              <th style="width:78px">Units Y1</th>
+              <th style="width:78px">Units Y2</th>
+              <th style="width:78px">Units Y3</th>
+              <th style="width:88px">Cost Y1</th>
+              <th style="width:88px">Cost Y2</th>
+              <th style="width:88px">Cost Y3</th>
+              <th style="width:28px"></th>
+            </tr></thead>
+            <tbody id="costBody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+          <button class="addbtn" onclick="addCost()">+ Blank row</button>
+          <button class="addbtn" onclick="preset('c1')">+ Partnerships Manager</button>
+          <button class="addbtn" onclick="preset('c2')">+ Sr. Partnerships Officer</button>
+          <button class="addbtn" onclick="preset('travel')">+ Travel</button>
+          <button class="addbtn" onclick="preset('premix')">+ Premix</button>
+          <button class="addbtn" onclick="preset('equip')">+ Equipment</button>
+          <button class="addbtn" onclick="preset('mae')">+ M&amp;E</button>
+          <button class="addbtn" onclick="preset('transport')">+ Transportation</button>
+          <button class="addbtn" onclick="preset('grinding')">+ Grinding</button>
+          <button class="addbtn" onclick="preset('packaging')">+ Packaging</button>
+        </div>
+      </div>
+
+      <!-- RESULTS -->
+      <div id="p-results" class="pane">
+        <div class="stitle">Summary</div>
+        <div class="cards" id="summCards"></div>
+        <div style="overflow-x:auto">
+          <table class="tbl" id="summTbl" style="margin-bottom:1.5rem">
+            <thead><tr id="summHead"></tr></thead>
+            <tbody id="summBody"></tbody>
+          </table>
+        </div>
+        <div style="height:280px;position:relative;margin-bottom:1.5rem">
+          <canvas id="chartC"></canvas>
+        </div>
+        <div class="stitle">Formulae</div>
+        <div id="fBox" class="note" style="margin-bottom:1.25rem;line-height:1.9"></div>
+        <div>
+          <button class="dlbtn" onclick="dlCSV()">↓ CSV</button>
+          <button class="dlbtn" onclick="dlXLSX()">↓ Excel (.xlsx)</button>
+          <button class="dlbtn" onclick="dlJSON()">↓ JSON</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/calculator.js"></script>
+</body>
+</html>

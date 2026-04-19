@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: botec-calculator
+    env: static
+    buildCommand: echo "No build step required"
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
