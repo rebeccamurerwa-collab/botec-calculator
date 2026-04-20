@@ -2,11 +2,13 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --navy:     #0f1f3d;
-  --teal:     #1D9E75;
-  --teal-lt:  #e1f5ee;
-  --blue:     #378ADD;
-  --blue-lt:  #e6f1fb;
+  --navy:     #0097a7;
+  --teal:     #dc6059;
+  --teal-lt:  #fdf0ef;
+  --blue:     #0097a7;
+  --blue-lt:  #e0f7fa;
+  --pink:     #ff8dcb;
+  --pink-lt:  #fff0f7;
   --red:      #c0392b;
   --red-lt:   #fdecea;
   --amber:    #BA7517;
@@ -47,7 +49,7 @@ select, textarea {
   outline: none;
   transition: border-color 0.15s;
 }
-input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(55,138,221,0.12); }
+input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,151,167,0.12); }
 textarea { resize: vertical; line-height: 1.5; }
 
 /* ---- Buttons ---- */
@@ -199,7 +201,7 @@ textarea { resize: vertical; line-height: 1.5; }
 .tbl tr.total-row td { background: var(--surface2); font-weight: 500; border-top: 1px solid var(--border2); }
 .tbl tr.grand-row td { border-top: 1.5px solid var(--border2); font-weight: 500; font-size: 14px; }
 .tbl tr.derived-row td { color: var(--text2); font-size: 12px; }
-.tbl tr.cpb-row td { color: var(--blue); font-weight: 500; }
+.tbl tr.cpb-row td { color: #dc6059; font-weight: 500; }
 .cost-computed { text-align: right; color: var(--text2); font-size: 12px; }
 
 .del { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 18px; padding: 0 3px; line-height: 1; }
