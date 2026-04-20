@@ -153,11 +153,10 @@
         <div style="height:280px;position:relative;margin-bottom:1.5rem">
           <canvas id="chartC"></canvas>
         </div>
-        <div class="stitle">Formulae</div>
-        <div id="fBox" class="note" style="margin-bottom:1.25rem;line-height:1.9"></div>
         <div>
           <button class="dlbtn" onclick="dlCSV()">↓ CSV</button>
           <button class="dlbtn" onclick="dlXLSX()">↓ Excel (.xlsx)</button>
+          <button class="dlbtn" onclick="dlPDF()">↓ PDF</button>
           <button class="dlbtn" onclick="dlJSON()">↓ JSON</button>
         </div>
       </div>
@@ -167,6 +166,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/calculator.js"></script>
 </body>
