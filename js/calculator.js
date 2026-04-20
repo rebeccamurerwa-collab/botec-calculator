@@ -391,7 +391,7 @@ function renderResults() {
 
   // Chart
   if (chart) chart.destroy();
-  const colors = ['#378ADD','#1D9E75','#BA7517','#D85A30','#D4537E','#7F77DD','#639922','#B4B2A9'];
+  const colors = ['#0097a7','#dc6059','#ff8dcb','#00bcd4','#f06292','#4dd0e1','#e57373','#80deea'];
   const datasets = ah.map((h, i) => ({
     label: h,
     data: [d.byHead[h].y1, d.byHead[h].y2, d.byHead[h].y3].slice(0, NY),
@@ -413,20 +413,6 @@ function renderResults() {
       }
     }
   });
-
-  // Formula box
-  const b = nv('bufferPct'), m = nv('mgrMult');
-  document.getElementById('fBox').innerHTML =
-    `<strong>Beneficiaries [Yr]</strong> = Row₁[Yr] × Row₂[Yr] × … (product of all unit rows)<br>` +
-    `<strong>Row cost [Yr]</strong> = Cost/unit × Units [Yr]<br>` +
-    `<strong>Cost head total [Yr]</strong> = Σ all rows with that head<br>` +
-    `<strong>Managerial multiplier [Yr]</strong> = Internal Consulting [Yr] × ${m}%<br>` +
-    `<strong>Sub-total [Yr]</strong> = Σ(all cost heads [Yr]) + managerial multiplier [Yr]<br>` +
-    `<strong>Buffer [Yr]</strong> = Sub-total [Yr] × ${b}%<br>` +
-    `<strong>Total cost [Yr]</strong> = Sub-total [Yr] + Buffer [Yr]<br>` +
-    `<strong>CPB [Yr]</strong> = Total cost [Yr] ÷ Beneficiaries [Yr]<br>` +
-    `<strong>CPB (avg)</strong> = Σ(Total cost) ÷ Σ(Beneficiaries) — not average of averages<br>` +
-    `<strong>CPB excl. logistics [Yr]</strong> = (Non-logistics sub-total + mgr multiplier) × (1 + ${b}%) ÷ Beneficiaries [Yr]`;
 }
 
 // ---- EXPORTS ----
@@ -515,6 +501,152 @@ function dlXLSX() {
   XLSX.utils.book_append_sheet(WB, XLSX.utils.aoa_to_sheet(uc), 'Unit Costs');
 
   XLSX.writeFile(WB, `BOTEC_${pn.replace(/\s+/g,'_')}.xlsx`);
+}
+
+function dlPDF() {
+  calcAll(); const d = lastCalc;
+  if (!d.rows) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pn = document.getElementById('projName').value || 'BOTEC';
+  const cur = document.getElementById('currency').value;
+  const NY = d.NY || 3;
+  const s = getSym();
+  const fmtN = n => s + Math.round(n).toLocaleString();
+  const fmtD = (n, dp=2) => s + n.toFixed(dp);
+
+  // Header bar
+  doc.setFillColor(0, 151, 167);
+  doc.rect(0, 0, 297, 18, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+  doc.text('BOTEC Cost Per Beneficiary Estimate', 14, 12);
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text(pn, 200, 12);
+
+  // Meta info
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(8);
+  const prepBy = document.getElementById('prepBy').value;
+  const prepDate = document.getElementById('prepDate').value;
+  doc.text(`Prepared by: ${prepBy || '—'}   Date: ${prepDate || '—'}   Programme: ${document.getElementById('programme').value || '—'}`, 14, 26);
+
+  // Summary cards
+  doc.setFillColor(220, 96, 89);
+  doc.roundedRect(14, 30, 58, 18, 2, 2, 'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text('Cost per beneficiary (avg)', 18, 36);
+  doc.setFontSize(12); doc.setFont('helvetica','bold');
+  doc.text(fmtD(d.cpbAvg), 18, 44);
+
+  doc.setFillColor(0, 151, 167);
+  doc.roundedRect(76, 30, 58, 18, 2, 2, 'F');
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text('Total ' + NY + '-year cost', 80, 36);
+  doc.setFontSize(12); doc.setFont('helvetica','bold');
+  doc.text(fmtN(d.totalAll), 80, 44);
+
+  doc.setFillColor(255, 141, 203);
+  doc.roundedRect(138, 30, 58, 18, 2, 2, 'F');
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text('Average yearly cost', 142, 36);
+  doc.setFontSize(12); doc.setFont('helvetica','bold');
+  doc.text(fmtN(d.avgCost), 142, 44);
+
+  doc.setFillColor(0, 151, 167);
+  doc.roundedRect(200, 30, 58, 18, 2, 2, 'F');
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text('Total beneficiaries', 204, 36);
+  doc.setFontSize(12); doc.setFont('helvetica','bold');
+  doc.text(Math.round(d.totalBen).toLocaleString(), 204, 44);
+
+  // Summary table
+  const yrs = Array.from({length: NY}, (_,i) => `Year ${i+1}`);
+  const ah = HEADS.filter(h => d.byHead[h] && d.byHead[h].y1+d.byHead[h].y2+d.byHead[h].y3 > 0);
+  const tableRows = [];
+  ah.forEach(h => {
+    const v = d.byHead[h], vals = [v.y1,v.y2,v.y3].slice(0,NY), t = vals.reduce((s,x)=>s+x,0);
+    tableRows.push([h, ...vals.map(x=>fmtN(x)), fmtN(t/NY), fmtN(t)]);
+  });
+  const mv = [d.mgrVal.y1,d.mgrVal.y2,d.mgrVal.y3].slice(0,NY), mt=mv.reduce((s,x)=>s+x,0);
+  if(mt>0) tableRows.push([`${(d.mgr*100).toFixed(0)}% managerial multiplier`, ...mv.map(x=>fmtN(x)), fmtN(mt/NY), fmtN(mt)]);
+  const bv=[d.bufVal.y1,d.bufVal.y2,d.bufVal.y3].slice(0,NY), bt=bv.reduce((s,x)=>s+x,0);
+  if(bt>0) tableRows.push([`${(d.buf*100).toFixed(0)}% buffer`, ...bv.map(x=>fmtN(x)), fmtN(bt/NY), fmtN(bt)]);
+  tableRows.push(['TOTAL COSTS', ...d.yrTotals.map(x=>fmtN(x)), fmtN(d.avgCost), fmtN(d.totalAll)]);
+  tableRows.push(['Number of beneficiaries', ...d.bens.map(x=>Math.round(x).toLocaleString()), Math.round(d.totalBen/NY).toLocaleString(), Math.round(d.totalBen).toLocaleString()]);
+  tableRows.push(['Cost per beneficiary', ...d.cpbY.slice(0,NY).map(x=>fmtD(x)), fmtD(d.cpbAvg), fmtD(d.cpbAvg)]);
+  if(logSet.size>0) tableRows.push([`CPB excl. ${[...logSet].join('+')}`, ...d.cpbExclY.slice(0,NY).map(x=>fmtD(x)), fmtD(d.cpbExclAvg), fmtD(d.cpbExclAvg)]);
+
+  doc.autoTable({
+    startY: 55,
+    head: [['Cost head', ...yrs, 'Avg / year', `${NY}-year total`]],
+    body: tableRows,
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [0,151,167], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245,245,245] },
+    didParseCell: data => {
+      const lastRows = ['TOTAL COSTS','Cost per beneficiary', `CPB excl. ${[...logSet].join('+')}`];
+      if (lastRows.includes(data.row.raw[0])) {
+        data.cell.styles.fontStyle = 'bold';
+        if (data.row.raw[0].startsWith('Cost per') || data.row.raw[0].startsWith('CPB excl')) {
+          data.cell.styles.textColor = [220,96,89];
+        }
+      }
+    },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Beneficiary breakdown on new page
+  doc.addPage();
+  doc.setFillColor(0,151,167);
+  doc.rect(0,0,297,18,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text('Beneficiary Calculation', 14, 12);
+
+  const benRows = getBenRows();
+  doc.autoTable({
+    startY: 25,
+    head: [['Unit label','Unit name','Notes','Year 1','Year 2','Year 3']],
+    body: [
+      ...benRows.map(r => [r.label, r.name, r.notes, isNaN(r.y1)?'':r.y1.toLocaleString(), isNaN(r.y2)?'':r.y2.toLocaleString(), isNaN(r.y3)?'':r.y3.toLocaleString()]),
+      ['Total Beneficiaries','','', Math.round(d.b1).toLocaleString(), Math.round(d.b2).toLocaleString(), Math.round(d.b3).toLocaleString()]
+    ],
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: [0,151,167], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245,245,245] },
+    didParseCell: data => {
+      if (data.row.raw[0] === 'Total Beneficiaries') data.cell.styles.fontStyle = 'bold';
+    },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Cost items on new page
+  doc.addPage();
+  doc.setFillColor(0,151,167);
+  doc.rect(0,0,297,18,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text('Cost Line Items', 14, 12);
+
+  doc.autoTable({
+    startY: 25,
+    head: [['Cost head','Description','Unit',`Cost/unit (${cur})`,`Units Y1`,`Cost Y1`,`Units Y2`,`Cost Y2`,`Units Y3`,`Cost Y3`]],
+    body: d.rows.map(r => [r.head, r.desc, r.unit, fmtN(r.cpu), r.u1, fmtN(r.cy1), r.u2, fmtN(r.cy2), r.u3, fmtN(r.cy3)]),
+    styles: { fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: [0,151,167], textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245,245,245] },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Footer on all pages
+  const pageCount = doc.internal.getNumberOfPages();
+  for(let i=1; i<=pageCount; i++){
+    doc.setPage(i);
+    doc.setFontSize(7); doc.setTextColor(150,150,150); doc.setFont('helvetica','normal');
+    doc.text(`${pn} — BOTEC Estimate`, 14, 205);
+    doc.text(`Page ${i} of ${pageCount}`, 270, 205);
+  }
+
+  doc.save(`BOTEC_${pn.replace(/\s+/g,'_')}.pdf`);
 }
 
 // Mark unsaved on any input change
