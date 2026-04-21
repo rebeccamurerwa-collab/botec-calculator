@@ -76,51 +76,67 @@
       <!-- BENEFICIARIES -->
       <div id="p-ben" class="pane">
         <div class="stitle">Beneficiary calculation</div>
-        <div class="note">Break the estimate into hierarchical units — e.g. Districts → Schools per District → Students per School. Total Beneficiaries = product of all rows per year.</div>
-        <table class="tbl" id="benTbl">
-          <thead>
-            <tr>
-              <th style="min-width:200px">Template label</th>
-              <th style="min-width:150px">Unit name <span class="ftag">rename</span></th>
-              <th style="min-width:170px">Notes / source</th>
-              <th style="width:90px">Year 1</th>
-              <th style="width:90px">Year 2</th>
-              <th style="width:90px">Year 3</th>
-              <th style="width:28px"></th>
-            </tr>
-          </thead>
-          <tbody id="benBody"></tbody>
-          <tfoot>
-            <tr class="total-row">
-              <td colspan="3" style="font-weight:500">Total Beneficiaries <span class="ftag">= product of rows above</span></td>
-              <td style="text-align:right" id="tot1">—</td>
-              <td style="text-align:right" id="tot2">—</td>
-              <td style="text-align:right" id="tot3">—</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-        <button class="addbtn" onclick="addBen()">+ Add row</button>
-        <div id="benExplain" class="note" style="margin-top:10px;margin-bottom:0"></div>
+        <div class="note">Enter the number of direct beneficiaries in Year 1. If you expect the programme to reach more people each year, set an annual growth rate — Years 2 and 3 will calculate automatically.</div>
+        <div class="frow f3" style="margin-top:1.25rem">
+          <div class="field">
+            <label>Year 1 beneficiaries</label>
+            <input type="number" id="benY1" placeholder="e.g. 115000" oninput="calcBens()">
+          </div>
+          <div class="field">
+            <label>Annual growth rate %</label>
+            <input type="number" id="benGrowth" placeholder="0" value="0" oninput="calcBens()">
+            <span style="font-size:11px;color:var(--text3);margin-top:4px;display:block">Leave at 0 if beneficiaries stay the same each year</span>
+          </div>
+          <div class="field">
+            <label>Notes / source</label>
+            <input type="text" id="benNotes" placeholder="e.g. Based on district census data">
+          </div>
+        </div>
+
+        <div style="margin-top:1.25rem;background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem">
+          <div class="stitle" style="margin-bottom:1rem">Calculated beneficiaries per year</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:1rem">
+            <div style="text-align:center;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px">
+              <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Year 1</div>
+              <div id="ben-show-1" style="font-size:26px;font-weight:600;color:var(--navy)">—</div>
+            </div>
+            <div style="text-align:center;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px">
+              <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Year 2</div>
+              <div id="ben-show-2" style="font-size:26px;font-weight:600;color:var(--navy)">—</div>
+              <div id="ben-growth-2" style="font-size:11px;color:var(--teal);margin-top:4px"></div>
+            </div>
+            <div style="text-align:center;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px">
+              <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Year 3</div>
+              <div id="ben-show-3" style="font-size:26px;font-weight:600;color:var(--navy)">—</div>
+              <div id="ben-growth-3" style="font-size:11px;color:var(--teal);margin-top:4px"></div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:1rem;border-top:0.5px solid var(--border);font-size:14px">
+            <span style="color:var(--text2)">Total beneficiaries across all years</span>
+            <span id="ben-total" style="font-weight:600;font-size:16px">—</span>
+          </div>
+        </div>
       </div>
 
       <!-- COSTS -->
       <div id="p-costs" class="pane">
         <div class="stitle">Cost line items</div>
-        <div class="note">Cost [Yr] = Cost/unit × Units [Yr]. Managerial multiplier and buffer are added automatically in the summary.</div>
+        <div class="note">
+          <strong>How to fill this in:</strong> Each row is one type of cost. The <strong>Unit</strong> is what you are counting (e.g. one staff member, one trip, one KG of premix). The <strong>Monthly cost per unit</strong> is what that one unit costs per month. <strong>Units per year</strong> is how many of that unit are used in each year — enter 0 if not applicable. Cost for each year is calculated automatically as: Monthly cost × Units.
+        </div>
         <div style="overflow-x:auto">
           <table class="tbl" id="costTbl">
             <thead><tr>
               <th style="min-width:155px">Cost head</th>
-              <th style="min-width:165px">Description</th>
-              <th style="min-width:100px">Unit label</th>
-              <th style="width:100px">Cost/unit</th>
-              <th style="width:78px">Units Y1</th>
-              <th style="width:78px">Units Y2</th>
-              <th style="width:78px">Units Y3</th>
-              <th style="width:88px">Cost Y1</th>
-              <th style="width:88px">Cost Y2</th>
-              <th style="width:88px">Cost Y3</th>
+              <th style="min-width:180px">Description <span class="ftag">what is being costed</span></th>
+              <th style="min-width:120px">Unit <span class="ftag">what 1 unit is</span></th>
+              <th style="width:110px">Monthly cost<br>per unit</th>
+              <th style="width:78px">Units<br>Year 1</th>
+              <th style="width:78px">Units<br>Year 2</th>
+              <th style="width:78px">Units<br>Year 3</th>
+              <th style="width:90px">Cost Y1</th>
+              <th style="width:90px">Cost Y2</th>
+              <th style="width:90px">Cost Y3</th>
               <th style="width:28px"></th>
             </tr></thead>
             <tbody id="costBody"></tbody>
