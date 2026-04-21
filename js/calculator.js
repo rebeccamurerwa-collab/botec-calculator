@@ -1,89 +1,91 @@
 // BOTEC Calculator JS
-// Handles: beneficiary rows, cost rows, calculations, save/load, exports
 
 const HEADS = ['Internal Consulting','Travel Costs','Premix Costs','Equipment Costs',
   'M&E Costs','Logistics Costs','Packaging Costs','Event / Admin Costs','Other'];
 
+// Unit costs keep their defaults; units per year are empty by default
 const PRESETS = {
-  c1:        { h:'Internal Consulting', d:'Partnerships Manager',           u:'Person-month', cpu:105000, y1:9.6,       y2:8.4,       y3:7.2 },
-  c2:        { h:'Internal Consulting', d:'Senior Partnerships Officer',    u:'Person-month', cpu:85000,  y1:10.8,      y2:9.6,       y3:8.4 },
-  travel:    { h:'Travel Costs',        d:'Travel – Partnerships Manager',  u:'Trip',         cpu:25000,  y1:12,        y2:6,         y3:4   },
-  premix:    { h:'Premix Costs',        d:'NaFeEDTA premix',                u:'KG',           cpu:400,    y1:3690,      y2:3690,      y3:3690 },
-  equip:     { h:'Equipment Costs',     d:'Microdoser',                     u:'Device',       cpu:200000, y1:5,         y2:0,         y3:0   },
-  mae:       { h:'M&E Costs',           d:'Iron spot test kit',             u:'Kit',          cpu:1750,   y1:10,        y2:10,        y3:10  },
-  transport: { h:'Logistics Costs',     d:'Transportation cost',            u:'Per KG atta',  cpu:1,      y1:18450000,  y2:18450000,  y3:18450000 },
-  grinding:  { h:'Logistics Costs',     d:'Grinding cost',                  u:'Per KG wheat', cpu:3,      y1:18450000,  y2:18450000,  y3:18450000 },
-  packaging: { h:'Packaging Costs',     d:'Packaging cost',           u:'Per KG wheat flour', cpu:0.5,    y1:18450000,  y2:18450000,  y3:18450000 }
+  c1: {
+    h:'Internal Consulting', d:'Partnerships Manager', u:'Staff member', cpu:105000, y1:'', y2:'', y3:'',
+    guide:'How many months does this person work on the project each year? E.g. if they spend 80% of their time over 12 months, enter 9.6.'
+  },
+  c2: {
+    h:'Internal Consulting', d:'Senior Partnerships Officer', u:'Staff member', cpu:85000, y1:'', y2:'', y3:'',
+    guide:'How many months does this person work on the project each year? E.g. 90% of 12 months = 10.8 months.'
+  },
+  travel: {
+    h:'Travel Costs', d:'Travel – Partnerships Manager', u:'Trip', cpu:25000, y1:'', y2:'', y3:'',
+    guide:'How many field trips are taken each year? Each trip is costed at the rate above. E.g. one trip per month = 12.'
+  },
+  premix: {
+    h:'Premix Costs', d:'NaFeEDTA premix', u:'KG', cpu:400, y1:'', y2:'', y3:'',
+    guide:'Total KGs of premix needed each year. Calculate as: beneficiaries × daily consumption (g) × serving days ÷ 1,000,000.'
+  },
+  equip: {
+    h:'Equipment Costs', d:'Microdoser', u:'Device', cpu:200000, y1:'', y2:'', y3:'',
+    guide:'Number of devices to purchase. Usually a one-time purchase in Year 1 only — enter 0 for Years 2 and 3.'
+  },
+  mae: {
+    h:'M&E Costs', d:'Iron spot test kit', u:'Kit', cpu:1750, y1:'', y2:'', y3:'',
+    guide:'Number of test kits used per year. Typically one kit per mill per testing round (e.g. 10 mills × 1 test = 10).'
+  },
+  transport: {
+    h:'Logistics Costs', d:'Transportation cost', u:'KG atta', cpu:1, y1:'', y2:'', y3:'',
+    guide:'Total KGs of atta transported per year. Convert from MT: monthly consumption (MT) × 1,000 × 12 months.'
+  },
+  grinding: {
+    h:'Logistics Costs', d:'Grinding cost', u:'KG wheat', cpu:3, y1:'', y2:'', y3:'',
+    guide:'Total KGs of wheat to be ground per year. Typically the same volume as your annual atta consumption.'
+  },
+  packaging: {
+    h:'Packaging Costs', d:'Packaging cost', u:'KG wheat flour', cpu:0.5, y1:'', y2:'', y3:'',
+    guide:'Total KGs of wheat flour packaged per year. Same as your annual atta consumption volume.'
+  }
 };
-
-const BEN_LABELS = [
-  '<Major Unit> Number',
-  '<Minor Unit> Number',
-  'Number of Beneficiaries per <Minor Unit>',
-  '<Sub-unit> Number',
-  'Number of Beneficiaries per <Sub-unit>',
-  'Custom'
-];
 
 let logSet = new Set(['Logistics Costs']);
 let chart = null;
 let lastCalc = {};
 let docId = null;
 let currentUser = null;
-let benID = 0, cID = 0;
+let cID = 0;
 
 // ---- AUTH GUARD ----
 async function init() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'login.html'; return; }
   currentUser = session.user;
-
   renderLogFlags();
-
-  // Check if opening existing doc
   const params = new URLSearchParams(window.location.search);
   docId = params.get('id');
-
-  if (docId) {
-    await loadDocument(docId);
-  }
-  // else blank calculator — no default data
+  if (docId) await loadDocument(docId);
 }
 
 // ---- SAVE / LOAD ----
 function setSaveStatus(msg, colour) {
   const el = document.getElementById('save-status');
   el.textContent = msg;
-  el.style.color = colour || 'var(--color-text-secondary)';
+  el.style.color = colour || 'var(--text3)';
 }
 
 async function saveDocument() {
   setSaveStatus('Saving…');
   calcAll();
-
   const name = document.getElementById('doc-title').value.trim() || 'Untitled BOTEC';
   const programme = document.getElementById('programme').value.trim();
-
-  // Serialise full state
   const data = serialiseState();
-
   if (docId) {
-    const { error } = await sb.from('botec_documents')
-      .update({ name, programme, data })
-      .eq('id', docId);
+    const { error } = await sb.from('botec_documents').update({ name, programme, data }).eq('id', docId);
     if (error) { setSaveStatus('Save failed', '#c0392b'); alert(error.message); return; }
   } else {
     const { data: inserted, error } = await sb.from('botec_documents')
-      .insert({ user_id: currentUser.id, name, programme, data })
-      .select('id')
-      .single();
+      .insert({ user_id: currentUser.id, name, programme, data }).select('id').single();
     if (error) { setSaveStatus('Save failed', '#c0392b'); alert(error.message); return; }
     docId = inserted.id;
     window.history.replaceState({}, '', `calculator.html?id=${docId}`);
   }
-
   document.title = `${name} — BOTEC`;
-  setSaveStatus('Saved', 'var(--color-text-success, #1D9E75)');
+  setSaveStatus('Saved', '#059669');
   setTimeout(() => setSaveStatus(''), 3000);
 }
 
@@ -99,7 +101,6 @@ async function loadDocument(id) {
 function serialiseState() {
   calcAll();
   return {
-    // setup
     projName: document.getElementById('projName').value,
     programme: document.getElementById('programme').value,
     prepBy: document.getElementById('prepBy').value,
@@ -112,10 +113,10 @@ function serialiseState() {
     mgrMult: document.getElementById('mgrMult').value,
     purposeNote: document.getElementById('purposeNote').value,
     logSet: [...logSet],
-    // rows
-    benRows: getBenRows(),
+    benY1: document.getElementById('benY1').value,
+    benGrowth: document.getElementById('benGrowth').value,
+    benNotes: document.getElementById('benNotes').value,
     costRows: getCostData(),
-    // calc results (for dashboard preview)
     cpbAvg: lastCalc.cpbAvg,
     totalBen: lastCalc.totalBen,
     totalAll: lastCalc.totalAll
@@ -124,7 +125,6 @@ function serialiseState() {
 
 function deserialiseState(s) {
   if (!s) return;
-  // setup
   const set = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
   set('projName', s.projName); set('programme', s.programme);
   set('prepBy', s.prepBy); set('prepDate', s.prepDate);
@@ -132,19 +132,14 @@ function deserialiseState(s) {
   set('currency', s.currency); set('numYears', s.numYears);
   set('bufferPct', s.bufferPct); set('mgrMult', s.mgrMult);
   set('purposeNote', s.purposeNote);
-
   if (s.logSet) { logSet = new Set(s.logSet); renderLogFlags(); }
-
-  // beneficiary rows
-  document.getElementById('benBody').innerHTML = '';
-  benID = 0;
-  (s.benRows || []).forEach(r => addBen(r));
-
-  // cost rows
+  set('benY1', s.benY1);
+  set('benGrowth', s.benGrowth || '0');
+  set('benNotes', s.benNotes);
+  calcBens();
   document.getElementById('costBody').innerHTML = '';
   cID = 0;
   (s.costRows || []).forEach(r => addCost(r));
-
   calcAll();
 }
 
@@ -153,8 +148,8 @@ function renderLogFlags() {
   const el = document.getElementById('logFlags');
   el.innerHTML = HEADS.map(h => `
     <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;
-      border:0.5px solid var(--color-border-tertiary);border-radius:20px;
-      background:${logSet.has(h) ? 'var(--color-background-info,#e6f1fb)' : 'var(--color-background-secondary)'}">
+      border:0.5px solid var(--border);border-radius:20px;
+      background:${logSet.has(h) ? '#e0f7fa' : 'var(--surface2)'}">
       <input type="checkbox" ${logSet.has(h) ? 'checked' : ''} onchange="toggleLog('${h}',this.checked)"
         style="width:auto;margin:0"> ${h}
     </label>`).join('');
@@ -171,67 +166,36 @@ function go(id) {
   if (id === 'results') { calcAll(); renderResults(); }
 }
 
-// ---- BENEFICIARY ROWS ----
-function addBen(d = {}) {
-  const id = ++benID;
-  const tr = document.createElement('tr');
-  tr.id = 'bn' + id;
-  const labelSel = BEN_LABELS.map(l =>
-    `<option value="${l}" ${(d.label || BEN_LABELS[0]) === l ? 'selected' : ''}>${l}</option>`
-  ).join('');
-  tr.innerHTML = `
-    <td><select style="font-size:12px" onchange="calcBens()">${labelSel}</select></td>
-    <td><input type="text" placeholder="e.g. Districts" value="${d.name || ''}" style="font-style:italic"></td>
-    <td><input type="text" placeholder="Source / assumption" value="${d.notes || ''}"></td>
-    <td><input type="number" value="${d.y1 != null && !isNaN(d.y1) ? d.y1 : ''}" style="text-align:right" oninput="calcBens()"></td>
-    <td><input type="number" value="${d.y2 != null && !isNaN(d.y2) ? d.y2 : ''}" style="text-align:right" oninput="calcBens()"></td>
-    <td><input type="number" value="${d.y3 != null && !isNaN(d.y3) ? d.y3 : ''}" style="text-align:right" oninput="calcBens()"></td>
-    <td><button class="del" onclick="document.getElementById('bn${id}').remove();calcBens()">×</button></td>`;
-  document.getElementById('benBody').appendChild(tr);
-  calcBens();
-}
-
-function getBenRows() {
-  return Array.from(document.querySelectorAll('#benBody tr')).map(tr => {
-    const ins = tr.querySelectorAll('input,select');
-    return {
-      label: ins[0].value, name: ins[1].value, notes: ins[2].value,
-      y1: parseFloat(ins[3].value), y2: parseFloat(ins[4].value), y3: parseFloat(ins[5].value)
-    };
-  });
-}
-
+// ---- BENEFICIARIES (simplified) ----
 function calcBens() {
-  const rows = getBenRows();
-  let p1 = null, p2 = null, p3 = null;
-  rows.forEach(r => {
-    if (!isNaN(r.y1)) p1 = p1 === null ? r.y1 : p1 * r.y1;
-    if (!isNaN(r.y2)) p2 = p2 === null ? r.y2 : p2 * r.y2;
-    if (!isNaN(r.y3)) p3 = p3 === null ? r.y3 : p3 * r.y3;
-  });
-  const fmt = n => n !== null ? `<strong>${Math.round(n).toLocaleString()}</strong>` : '—';
-  document.getElementById('tot1').innerHTML = fmt(p1);
-  document.getElementById('tot2').innerHTML = fmt(p2);
-  document.getElementById('tot3').innerHTML = fmt(p3);
+  const { b1, b2, b3 } = getBenTotals();
+  const growth = parseFloat(document.getElementById('benGrowth').value) || 0;
+  const NY = parseInt(document.getElementById('numYears').value) || 3;
+  const fmt = n => n > 0 ? Math.round(n).toLocaleString() : '—';
 
-  const names = rows.map(r => r.name || r.label.replace(/<|>/g, ''));
-  const vals1 = rows.map(r => isNaN(r.y1) ? '?' : r.y1);
-  const el = document.getElementById('benExplain');
-  if (el && rows.length > 0) {
-    el.innerHTML = `<strong>Formula (Year 1):</strong> ${names.map((n, i) => `${n || 'unit'} (${vals1[i]})`).join(' × ')} = <strong>${p1 !== null ? Math.round(p1).toLocaleString() : '?'}</strong> beneficiaries`;
+  document.getElementById('ben-show-1').textContent = fmt(b1);
+  document.getElementById('ben-show-2').textContent = NY >= 2 ? fmt(b2) : '—';
+  document.getElementById('ben-show-3').textContent = NY >= 3 ? fmt(b3) : '—';
+
+  const g2 = document.getElementById('ben-growth-2');
+  const g3 = document.getElementById('ben-growth-3');
+  if (growth !== 0 && b1 > 0) {
+    g2.textContent = `${growth > 0 ? '+' : ''}${growth}% vs Year 1`;
+    g3.textContent = `${growth > 0 ? '+' : ''}${(growth * 2).toFixed(1)}% vs Year 1`;
+  } else {
+    g2.textContent = ''; g3.textContent = '';
   }
+
+  const total = b1 + (NY >= 2 ? b2 : 0) + (NY >= 3 ? b3 : 0);
+  document.getElementById('ben-total').textContent = total > 0 ? Math.round(total).toLocaleString() : '—';
   calcAll();
 }
 
 function getBenTotals() {
-  const rows = getBenRows();
-  let p1 = null, p2 = null, p3 = null;
-  rows.forEach(r => {
-    if (!isNaN(r.y1)) p1 = p1 === null ? r.y1 : p1 * r.y1;
-    if (!isNaN(r.y2)) p2 = p2 === null ? r.y2 : p2 * r.y2;
-    if (!isNaN(r.y3)) p3 = p3 === null ? r.y3 : p3 * r.y3;
-  });
-  return { b1: p1 || 0, b2: p2 || 0, b3: p3 || 0 };
+  const y1 = parseFloat(document.getElementById('benY1').value) || 0;
+  const growth = parseFloat(document.getElementById('benGrowth').value) || 0;
+  const g = 1 + growth / 100;
+  return { b1: y1, b2: y1 * g, b3: y1 * g * g };
 }
 
 // ---- COST ROWS ----
@@ -240,21 +204,28 @@ function addCost(d = {}) {
   const tr = document.createElement('tr');
   tr.id = 'cr' + id;
   const sel = HEADS.map(h => `<option value="${h}" ${h === (d.h || d.head || HEADS[0]) ? 'selected' : ''}>${h}</option>`).join('');
-  const cpu = d.cpu || 0, u1 = d.y1 || d.u1 || 0, u2 = d.y2 || d.u2 || 0, u3 = d.y3 || d.u3 || 0;
+  const cpu = d.cpu != null ? d.cpu : '';
+  const u1 = (d.u1 != null && d.u1 !== '') ? d.u1 : (d.y1 !== '' && d.y1 != null ? d.y1 : '');
+  const u2 = (d.u2 != null && d.u2 !== '') ? d.u2 : (d.y2 !== '' && d.y2 != null ? d.y2 : '');
+  const u3 = (d.u3 != null && d.u3 !== '') ? d.u3 : (d.y3 !== '' && d.y3 != null ? d.y3 : '');
+  const guide = d.guide || '';
   tr.innerHTML = `
     <td><select onchange="calcAll()">${sel}</select></td>
-    <td><input type="text" value="${d.d || d.desc || ''}"></td>
-    <td><input type="text" value="${d.u || d.unit || ''}"></td>
-    <td><input type="number" value="${cpu}" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
-    <td><input type="number" value="${u1}" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
-    <td><input type="number" value="${u2}" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
-    <td><input type="number" value="${u3}" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
+    <td>
+      <input type="text" value="${d.d || d.desc || ''}">
+      ${guide ? `<div class="cost-guide">${guide}</div>` : ''}
+    </td>
+    <td><input type="text" value="${d.u || d.unit || ''}" placeholder="e.g. staff member, trip, KG"></td>
+    <td><input type="number" value="${cpu}" placeholder="Monthly cost" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
+    <td><input type="number" value="${u1}" placeholder="0" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
+    <td><input type="number" value="${u2}" placeholder="0" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
+    <td><input type="number" value="${u3}" placeholder="0" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
     <td id="cy1_${id}" class="cost-computed">—</td>
     <td id="cy2_${id}" class="cost-computed">—</td>
     <td id="cy3_${id}" class="cost-computed">—</td>
     <td><button class="del" onclick="document.getElementById('cr${id}').remove();calcAll()">×</button></td>`;
   document.getElementById('costBody').appendChild(tr);
-  updateCostRow(tr.querySelector('input'));
+  updateCostRow(tr.querySelector('input[type=number]'));
   calcAll();
 }
 function preset(k) { addCost(PRESETS[k]); }
@@ -267,8 +238,7 @@ function updateCostRow(inp) {
   const u2 = parseFloat(ins[2].value) || 0;
   const u3 = parseFloat(ins[3].value) || 0;
   const id = tr.id.replace('cr', '');
-  const sym = getSym();
-  const fmtC = n => sym + Math.round(n).toLocaleString();
+  const fmtC = n => getSym() + Math.round(n).toLocaleString();
   ['cy1_', 'cy2_', 'cy3_'].forEach((p, i) => {
     const el = document.getElementById(p + id);
     if (el) el.textContent = fmtC(cpu * [u1, u2, u3][i]);
@@ -353,12 +323,19 @@ function renderResults() {
   if (!d.yrTotals) return;
   const NY = d.NY || 3;
 
+  const abbr = n => {
+    if (n >= 1e7) return getSym() + (n/1e7).toFixed(2) + ' Cr';
+    if (n >= 1e5) return getSym() + (n/1e5).toFixed(2) + ' L';
+    if (n >= 1000) return getSym() + (n/1000).toFixed(1) + 'K';
+    return fCd(n);
+  };
+
   document.getElementById('summCards').innerHTML = `
-    <div class="card"><div class="lbl">CPB (avg)</div><div class="val">${fCd(d.cpbAvg)}</div><div class="sub">total cost ÷ total beneficiaries</div></div>
+    <div class="card"><div class="lbl">CPB — avg</div><div class="val">${fCd(d.cpbAvg)}</div><div class="sub">total cost ÷ total beneficiaries</div></div>
     <div class="card"><div class="lbl">CPB excl. logistics</div><div class="val">${fCd(d.cpbExclAvg)}</div></div>
-    <div class="card"><div class="lbl">Total ${NY}-year cost</div><div class="val">${fC(d.totalAll)}</div></div>
-    <div class="card"><div class="lbl">Avg yearly cost</div><div class="val">${fC(d.avgCost)}</div><div class="sub">total ÷ ${NY}</div></div>
-    <div class="card"><div class="lbl">Total beneficiaries</div><div class="val">${d.totalBen.toLocaleString()}</div></div>
+    <div class="card"><div class="lbl">Total ${NY}-yr cost</div><div class="val">${abbr(d.totalAll)}</div></div>
+    <div class="card"><div class="lbl">Avg yearly cost</div><div class="val">${abbr(d.avgCost)}</div><div class="sub">total ÷ ${NY}</div></div>
+    <div class="card"><div class="lbl">Total beneficiaries</div><div class="val">${d.totalBen >= 1e5 ? (d.totalBen/1000).toFixed(1)+'K' : Math.round(d.totalBen).toLocaleString()}</div></div>
   `;
 
   const yrs = Array.from({ length: NY }, (_, i) => `Year ${i + 1}`);
@@ -373,37 +350,30 @@ function renderResults() {
     bd.innerHTML += `<tr><td>${h}</td>${vals.map(x => `<td style="text-align:right">${fC(x)}</td>`).join('')}<td style="text-align:right">${fC(t/NY)}</td><td style="text-align:right">${fC(t)}</td></tr>`;
   });
 
-  const mv = [d.mgrVal.y1, d.mgrVal.y2, d.mgrVal.y3].slice(0, NY);
-  const mt = mv.reduce((s, x) => s + x, 0);
+  const mv = [d.mgrVal.y1, d.mgrVal.y2, d.mgrVal.y3].slice(0, NY), mt = mv.reduce((s, x) => s + x, 0);
   if (mt > 0) bd.innerHTML += `<tr class="derived-row"><td>${(d.mgr*100).toFixed(0)}% managerial multiplier</td>${mv.map(x => `<td style="text-align:right">${fC(x)}</td>`).join('')}<td style="text-align:right">${fC(mt/NY)}</td><td style="text-align:right">${fC(mt)}</td></tr>`;
 
-  const bv = [d.bufVal.y1, d.bufVal.y2, d.bufVal.y3].slice(0, NY);
-  const bt = bv.reduce((s, x) => s + x, 0);
+  const bv = [d.bufVal.y1, d.bufVal.y2, d.bufVal.y3].slice(0, NY), bt = bv.reduce((s, x) => s + x, 0);
   if (bt > 0) bd.innerHTML += `<tr class="derived-row"><td>${(d.buf*100).toFixed(0)}% buffer</td>${bv.map(x => `<td style="text-align:right">${fC(x)}</td>`).join('')}<td style="text-align:right">${fC(bt/NY)}</td><td style="text-align:right">${fC(bt)}</td></tr>`;
 
-  const tv = d.yrTotals;
-  bd.innerHTML += `<tr class="grand-row"><td>Total costs</td>${tv.map(x => `<td style="text-align:right">${fC(x)}</td>`).join('')}<td style="text-align:right">${fC(d.avgCost)}</td><td style="text-align:right">${fC(d.totalAll)}</td></tr>`;
+  bd.innerHTML += `<tr class="grand-row"><td>Total costs</td>${d.yrTotals.map(x => `<td style="text-align:right">${fC(x)}</td>`).join('')}<td style="text-align:right">${fC(d.avgCost)}</td><td style="text-align:right">${fC(d.totalAll)}</td></tr>`;
   bd.innerHTML += `<tr class="derived-row"><td>Number of beneficiaries</td>${d.bens.map(x => `<td style="text-align:right">${Math.round(x).toLocaleString()}</td>`).join('')}<td style="text-align:right">${Math.round(d.totalBen/NY).toLocaleString()}</td><td style="text-align:right">${Math.round(d.totalBen).toLocaleString()}</td></tr>`;
   bd.innerHTML += `<tr class="cpb-row"><td>Cost per beneficiary</td>${d.cpbY.slice(0,NY).map(x => `<td style="text-align:right">${fCd(x)}</td>`).join('')}<td style="text-align:right">${fCd(d.cpbAvg)}</td><td style="text-align:right">${fCd(d.cpbAvg)}</td></tr>`;
   if (logSet.size > 0) {
     bd.innerHTML += `<tr class="cpb-row" style="font-style:italic"><td>CPB excl. ${[...logSet].join(' + ')}</td>${d.cpbExclY.slice(0,NY).map(x => `<td style="text-align:right">${fCd(x)}</td>`).join('')}<td style="text-align:right">${fCd(d.cpbExclAvg)}</td><td style="text-align:right">${fCd(d.cpbExclAvg)}</td></tr>`;
   }
 
-  // Chart
   if (chart) chart.destroy();
   const colors = ['#0097a7','#dc6059','#ff8dcb','#00bcd4','#f06292','#4dd0e1','#e57373','#80deea'];
   const datasets = ah.map((h, i) => ({
-    label: h,
-    data: [d.byHead[h].y1, d.byHead[h].y2, d.byHead[h].y3].slice(0, NY),
-    backgroundColor: colors[i % colors.length],
-    stack: 's'
+    label: h, data: [d.byHead[h].y1, d.byHead[h].y2, d.byHead[h].y3].slice(0, NY),
+    backgroundColor: colors[i % colors.length], stack: 's'
   }));
   if (mt > 0) datasets.push({ label: 'Mgr multiplier', data: mv, backgroundColor: '#CCC', stack: 's' });
   if (bt > 0) datasets.push({ label: 'Buffer', data: bv, backgroundColor: '#E0E0E0', stack: 's' });
 
   chart = new Chart(document.getElementById('chartC').getContext('2d'), {
-    type: 'bar',
-    data: { labels: yrs, datasets },
+    type: 'bar', data: { labels: yrs, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fC(ctx.parsed.y)}` } } },
@@ -420,13 +390,10 @@ function dlCSV() {
   calcAll(); const d = lastCalc;
   const pn = document.getElementById('projName').value || 'BOTEC';
   let c = `BOTEC Cost Per Beneficiary Estimate\nProject,${pn}\n\n`;
-  c += `BENEFICIARY CALCULATION\nTemplate Label,Unit Name,Notes,Year 1,Year 2,Year 3\n`;
-  getBenRows().forEach(r => { c += `"${r.label}","${r.name}","${r.notes}",${isNaN(r.y1)?'':r.y1},${isNaN(r.y2)?'':r.y2},${isNaN(r.y3)?'':r.y3}\n`; });
-  c += `Total Beneficiaries,,,${Math.round(d.b1)},${Math.round(d.b2)},${Math.round(d.b3)}\n\n`;
-  c += `COST ITEMS\nCost Head,Description,Unit,Cost/unit,Units Y1,Cost Y1,Units Y2,Cost Y2,Units Y3,Cost Y3\n`;
+  c += `BENEFICIARIES\nYear 1,${Math.round(d.b1)}\nAnnual growth %,${document.getElementById('benGrowth').value||0}\nYear 2,${Math.round(d.b2)}\nYear 3,${Math.round(d.b3)}\nTotal,${Math.round(d.totalBen)}\n\n`;
+  c += `COST ITEMS\nCost Head,Description,Unit,Monthly Cost/unit,Units Y1,Cost Y1,Units Y2,Cost Y2,Units Y3,Cost Y3\n`;
   d.rows.forEach(r => { c += `${r.head},"${r.desc}","${r.unit}",${r.cpu},${r.u1},${r.cy1},${r.u2},${r.cy2},${r.u3},${r.cy3}\n`; });
-  c += `\nSUMMARY\nTotal,${d.totY.y1},${d.totY.y2},${d.totY.y3},${d.avgCost},${d.totalAll}\n`;
-  c += `CPB,${d.cpbY.join(',')},${d.cpbAvg}\nCPB excl logistics,${d.cpbExclY.join(',')},${d.cpbExclAvg}\n`;
+  c += `\nSUMMARY\nTotal,${d.totY.y1},${d.totY.y2},${d.totY.y3},${d.avgCost},${d.totalAll}\nCPB,${d.cpbY.join(',')},${d.cpbAvg}\n`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([c], { type: 'text/csv' }));
   a.download = `BOTEC_${pn.replace(/\s+/g,'_')}.csv`; a.click();
@@ -447,59 +414,46 @@ function dlXLSX() {
   const pn = document.getElementById('projName').value || 'BOTEC';
   const cur = document.getElementById('currency').value;
   const NY = d.NY || 3;
-
   XLSX.utils.book_append_sheet(WB, XLSX.utils.aoa_to_sheet([
-    ['READ-ME COST PER BENEFICIARY ESTIMATE'], [''],
-    ['Purpose', document.getElementById('purposeNote').value], [''],
-    ['Tabs','Details'],
-    ['Summary','Lays out the Cost per Beneficiary details'],
-    ['Beneficiary Calculation','Estimated number of beneficiaries'],
-    ['Cost Calculation','Estimated cost calculation'],
-    ['Unit Costs','Total units of resources used']
+    ['READ-ME COST PER BENEFICIARY ESTIMATE'],[''],
+    ['Purpose', document.getElementById('purposeNote').value],[''],
+    ['Tabs','Details'],['Summary','Cost per Beneficiary details'],
+    ['Beneficiary Calculation','Estimated beneficiaries'],['Cost Calculation','Estimated costs'],['Unit Costs','Unit reference']
   ]), 'Read Me');
-
   const sumRows = [
-    ['COST PER BENEFICIARY ESTIMATE'], [''],
-    ['Project Name:', pn],
-    ['Prepared By:', document.getElementById('prepBy').value],
-    ['Preparation Date:', document.getElementById('prepDate').value], [''],
-    ['Reviewed By:', document.getElementById('reviewBy').value], [''],
+    ['COST PER BENEFICIARY ESTIMATE'],[''],
+    ['Project Name:', pn],['Prepared By:', document.getElementById('prepBy').value],
+    ['Preparation Date:', document.getElementById('prepDate').value],[''],
+    ['Reviewed By:', document.getElementById('reviewBy').value],[''],
     ['','','Year 1','Year 2','Year 3','Average Cost','Total Cost'],
-    ['Number of Beneficiaries','', d.b1, d.b2, d.b3, d.totalBen/NY, d.totalBen], [''],
-    [`Costs (in ${cur}):`]
+    ['Number of Beneficiaries','', d.b1, d.b2, d.b3, d.totalBen/NY, d.totalBen],[''],['Costs (in '+cur+'):']
   ];
   HEADS.filter(h => d.byHead[h] && d.byHead[h].y1+d.byHead[h].y2+d.byHead[h].y3>0).forEach(h => {
-    const v = d.byHead[h], t = v.y1+v.y2+v.y3;
-    sumRows.push(['', h, v.y1, v.y2, v.y3, t/NY, t]);
+    const v=d.byHead[h],t=v.y1+v.y2+v.y3; sumRows.push(['',h,v.y1,v.y2,v.y3,t/NY,t]);
   });
-  const mt = d.mgrVal.y1+d.mgrVal.y2+d.mgrVal.y3;
-  if (mt > 0) sumRows.push(['', `${(d.mgr*100).toFixed(0)}% multiplier`, d.mgrVal.y1, d.mgrVal.y2, d.mgrVal.y3, mt/NY, mt]);
-  const bt = d.bufVal.y1+d.bufVal.y2+d.bufVal.y3;
-  sumRows.push(['', `${(d.buf*100).toFixed(0)}% Buffer`, d.bufVal.y1, d.bufVal.y2, d.bufVal.y3, bt/NY, bt], ['']);
-  sumRows.push(['Total Costs','', d.totY.y1, d.totY.y2, d.totY.y3, d.avgCost, d.totalAll]);
-  sumRows.push(['Cost per Beneficiary','', d.cpbY[0], d.cpbY[1]||'', d.cpbY[2]||'', d.cpbAvg, d.cpbAvg]);
-  if (logSet.size > 0) sumRows.push([`CPB excl. ${[...logSet].join('+')}`, cur, d.cpbExclY[0], d.cpbExclY[1]||'', d.cpbExclY[2]||'', d.cpbExclAvg, d.cpbExclAvg]);
+  const mt=d.mgrVal.y1+d.mgrVal.y2+d.mgrVal.y3;
+  if(mt>0) sumRows.push(['',`${(d.mgr*100).toFixed(0)}% multiplier`,d.mgrVal.y1,d.mgrVal.y2,d.mgrVal.y3,mt/NY,mt]);
+  const bt=d.bufVal.y1+d.bufVal.y2+d.bufVal.y3;
+  sumRows.push(['',`${(d.buf*100).toFixed(0)}% Buffer`,d.bufVal.y1,d.bufVal.y2,d.bufVal.y3,bt/NY,bt],['']);
+  sumRows.push(['Total Costs','',d.totY.y1,d.totY.y2,d.totY.y3,d.avgCost,d.totalAll]);
+  sumRows.push(['Cost per Beneficiary','',d.cpbY[0],d.cpbY[1]||'',d.cpbY[2]||'',d.cpbAvg,d.cpbAvg]);
+  if(logSet.size>0) sumRows.push([`CPB excl. ${[...logSet].join('+')}`,cur,d.cpbExclY[0],d.cpbExclY[1]||'',d.cpbExclY[2]||'',d.cpbExclAvg,d.cpbExclAvg]);
   XLSX.utils.book_append_sheet(WB, XLSX.utils.aoa_to_sheet(sumRows), 'Summary');
-
-  const benData = [['BENEFICIARY CALCULATIONS'],[''],
-    ['Notes:','Break down into hierarchical units. Total = product of all rows per year.'],[''],[''],
-    ['','Notes','Links','YEAR 1','YEAR 2','YEAR 3'],['']
-  ];
-  getBenRows().forEach(r => { benData.push([r.name||r.label, r.notes,'', isNaN(r.y1)?'':r.y1, isNaN(r.y2)?'':r.y2, isNaN(r.y3)?'':r.y3]); });
-  benData.push(['Number of Beneficiaries','','', Math.round(d.b1), Math.round(d.b2), Math.round(d.b3)]);
-  XLSX.utils.book_append_sheet(WB, XLSX.utils.aoa_to_sheet(benData), 'Beneficiary Calculation');
-
-  const cc = [['COST CALCULATION'],[''],
-    ['COST HEAD','UNITS DESCRIPTION','DESCRIPTION',`COST PER UNIT (${cur})`,'# Units Y1','# Units Y2','# Units Y3','Cost Y1','Cost Y2','Cost Y3']
-  ];
-  d.rows.forEach(r => { cc.push([r.head, r.desc,'', r.cpu, r.u1, r.u2, r.u3, r.cy1, r.cy2, r.cy3]); });
+  XLSX.utils.book_append_sheet(WB, XLSX.utils.aoa_to_sheet([
+    ['BENEFICIARY CALCULATIONS'],[''],
+    ['Year 1 Beneficiaries', Math.round(d.b1)],
+    ['Annual Growth %', document.getElementById('benGrowth').value||0],
+    ['Year 2 Beneficiaries', Math.round(d.b2)],
+    ['Year 3 Beneficiaries', Math.round(d.b3)],
+    ['Notes', document.getElementById('benNotes').value]
+  ]), 'Beneficiary Calculation');
+  const cc=[['COST CALCULATION'],[''],['COST HEAD','DESCRIPTION','UNIT',`MONTHLY COST/UNIT (${cur})`,'UNITS Y1','UNITS Y2','UNITS Y3','Cost Y1','Cost Y2','Cost Y3']];
+  d.rows.forEach(r=>{cc.push([r.head,r.desc,r.unit,r.cpu,r.u1,r.u2,r.u3,r.cy1,r.cy2,r.cy3]);});
   XLSX.utils.book_append_sheet(WB, XLSX.utils.aoa_to_sheet(cc), 'Cost Calculation');
-
-  const uc = [['Cost Head','Unit Description',`Cost per Unit (${cur})`,'Unit label']];
-  const seen = new Set();
-  d.rows.forEach(r => { const k = r.head+'|'+r.desc; if (!seen.has(k)) { seen.add(k); uc.push([r.head, r.desc, r.cpu, r.unit]); } });
+  const uc=[['Cost Head','Unit Description',`Monthly Cost/Unit (${cur})`,'Unit type']];
+  const seen=new Set();
+  d.rows.forEach(r=>{const k=r.head+'|'+r.desc;if(!seen.has(k)){seen.add(k);uc.push([r.head,r.desc,r.cpu,r.unit]);}});
   XLSX.utils.book_append_sheet(WB, XLSX.utils.aoa_to_sheet(uc), 'Unit Costs');
-
   XLSX.writeFile(WB, `BOTEC_${pn.replace(/\s+/g,'_')}.xlsx`);
 }
 
@@ -515,144 +469,69 @@ function dlPDF() {
   const fmtN = n => s + Math.round(n).toLocaleString();
   const fmtD = (n, dp=2) => s + n.toFixed(dp);
 
-  // Header bar
-  doc.setFillColor(0, 151, 167);
-  doc.rect(0, 0, 297, 18, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(13); doc.setFont('helvetica', 'bold');
-  doc.text('BOTEC Cost Per Beneficiary Estimate', 14, 12);
-  doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-  doc.text(pn, 200, 12);
-
-  // Meta info
-  doc.setTextColor(80, 80, 80);
-  doc.setFontSize(8);
-  const prepBy = document.getElementById('prepBy').value;
-  const prepDate = document.getElementById('prepDate').value;
-  doc.text(`Prepared by: ${prepBy || '—'}   Date: ${prepDate || '—'}   Programme: ${document.getElementById('programme').value || '—'}`, 14, 26);
-
-  // Summary cards
-  doc.setFillColor(220, 96, 89);
-  doc.roundedRect(14, 30, 58, 18, 2, 2, 'F');
-  doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','normal');
-  doc.text('Cost per beneficiary (avg)', 18, 36);
-  doc.setFontSize(12); doc.setFont('helvetica','bold');
-  doc.text(fmtD(d.cpbAvg), 18, 44);
-
-  doc.setFillColor(0, 151, 167);
-  doc.roundedRect(76, 30, 58, 18, 2, 2, 'F');
-  doc.setFontSize(7); doc.setFont('helvetica','normal');
-  doc.text('Total ' + NY + '-year cost', 80, 36);
-  doc.setFontSize(12); doc.setFont('helvetica','bold');
-  doc.text(fmtN(d.totalAll), 80, 44);
-
-  doc.setFillColor(255, 141, 203);
-  doc.roundedRect(138, 30, 58, 18, 2, 2, 'F');
-  doc.setFontSize(7); doc.setFont('helvetica','normal');
-  doc.text('Average yearly cost', 142, 36);
-  doc.setFontSize(12); doc.setFont('helvetica','bold');
-  doc.text(fmtN(d.avgCost), 142, 44);
-
-  doc.setFillColor(0, 151, 167);
-  doc.roundedRect(200, 30, 58, 18, 2, 2, 'F');
-  doc.setFontSize(7); doc.setFont('helvetica','normal');
-  doc.text('Total beneficiaries', 204, 36);
-  doc.setFontSize(12); doc.setFont('helvetica','bold');
-  doc.text(Math.round(d.totalBen).toLocaleString(), 204, 44);
-
-  // Summary table
-  const yrs = Array.from({length: NY}, (_,i) => `Year ${i+1}`);
-  const ah = HEADS.filter(h => d.byHead[h] && d.byHead[h].y1+d.byHead[h].y2+d.byHead[h].y3 > 0);
-  const tableRows = [];
-  ah.forEach(h => {
-    const v = d.byHead[h], vals = [v.y1,v.y2,v.y3].slice(0,NY), t = vals.reduce((s,x)=>s+x,0);
-    tableRows.push([h, ...vals.map(x=>fmtN(x)), fmtN(t/NY), fmtN(t)]);
-  });
-  const mv = [d.mgrVal.y1,d.mgrVal.y2,d.mgrVal.y3].slice(0,NY), mt=mv.reduce((s,x)=>s+x,0);
-  if(mt>0) tableRows.push([`${(d.mgr*100).toFixed(0)}% managerial multiplier`, ...mv.map(x=>fmtN(x)), fmtN(mt/NY), fmtN(mt)]);
-  const bv=[d.bufVal.y1,d.bufVal.y2,d.bufVal.y3].slice(0,NY), bt=bv.reduce((s,x)=>s+x,0);
-  if(bt>0) tableRows.push([`${(d.buf*100).toFixed(0)}% buffer`, ...bv.map(x=>fmtN(x)), fmtN(bt/NY), fmtN(bt)]);
-  tableRows.push(['TOTAL COSTS', ...d.yrTotals.map(x=>fmtN(x)), fmtN(d.avgCost), fmtN(d.totalAll)]);
-  tableRows.push(['Number of beneficiaries', ...d.bens.map(x=>Math.round(x).toLocaleString()), Math.round(d.totalBen/NY).toLocaleString(), Math.round(d.totalBen).toLocaleString()]);
-  tableRows.push(['Cost per beneficiary', ...d.cpbY.slice(0,NY).map(x=>fmtD(x)), fmtD(d.cpbAvg), fmtD(d.cpbAvg)]);
-  if(logSet.size>0) tableRows.push([`CPB excl. ${[...logSet].join('+')}`, ...d.cpbExclY.slice(0,NY).map(x=>fmtD(x)), fmtD(d.cpbExclAvg), fmtD(d.cpbExclAvg)]);
-
-  doc.autoTable({
-    startY: 55,
-    head: [['Cost head', ...yrs, 'Avg / year', `${NY}-year total`]],
-    body: tableRows,
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [0,151,167], textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [245,245,245] },
-    didParseCell: data => {
-      const lastRows = ['TOTAL COSTS','Cost per beneficiary', `CPB excl. ${[...logSet].join('+')}`];
-      if (lastRows.includes(data.row.raw[0])) {
-        data.cell.styles.fontStyle = 'bold';
-        if (data.row.raw[0].startsWith('Cost per') || data.row.raw[0].startsWith('CPB excl')) {
-          data.cell.styles.textColor = [220,96,89];
-        }
-      }
-    },
-    margin: { left: 14, right: 14 }
-  });
-
-  // Beneficiary breakdown on new page
-  doc.addPage();
-  doc.setFillColor(0,151,167);
-  doc.rect(0,0,297,18,'F');
+  doc.setFillColor(0,151,167); doc.rect(0,0,297,18,'F');
   doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
-  doc.text('Beneficiary Calculation', 14, 12);
+  doc.text('BOTEC Cost Per Beneficiary Estimate', 14, 12);
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.text(pn, 200, 12);
+  doc.setTextColor(80,80,80); doc.setFontSize(8);
+  doc.text(`Prepared by: ${document.getElementById('prepBy').value||'—'}   Date: ${document.getElementById('prepDate').value||'—'}   Programme: ${document.getElementById('programme').value||'—'}`, 14, 26);
 
-  const benRows = getBenRows();
-  doc.autoTable({
-    startY: 25,
-    head: [['Unit label','Unit name','Notes','Year 1','Year 2','Year 3']],
-    body: [
-      ...benRows.map(r => [r.label, r.name, r.notes, isNaN(r.y1)?'':r.y1.toLocaleString(), isNaN(r.y2)?'':r.y2.toLocaleString(), isNaN(r.y3)?'':r.y3.toLocaleString()]),
-      ['Total Beneficiaries','','', Math.round(d.b1).toLocaleString(), Math.round(d.b2).toLocaleString(), Math.round(d.b3).toLocaleString()]
-    ],
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [0,151,167], textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [245,245,245] },
-    didParseCell: data => {
-      if (data.row.raw[0] === 'Total Beneficiaries') data.cell.styles.fontStyle = 'bold';
-    },
-    margin: { left: 14, right: 14 }
+  const cards=[
+    {label:'Cost per beneficiary (avg)',val:fmtD(d.cpbAvg),color:[220,96,89]},
+    {label:`Total ${NY}-year cost`,val:fmtN(d.totalAll),color:[0,151,167]},
+    {label:'Avg yearly cost',val:fmtN(d.avgCost),color:[255,141,203]},
+    {label:'Total beneficiaries',val:Math.round(d.totalBen).toLocaleString(),color:[0,151,167]}
+  ];
+  cards.forEach((c,i)=>{
+    doc.setFillColor(...c.color); doc.roundedRect(14+i*71,30,66,18,2,2,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text(c.label, 18+i*71, 36); doc.setFontSize(11); doc.setFont('helvetica','bold');
+    doc.text(c.val, 18+i*71, 44);
   });
 
-  // Cost items on new page
+  const yrs=Array.from({length:NY},(_,i)=>`Year ${i+1}`);
+  const ah=HEADS.filter(h=>d.byHead[h]&&d.byHead[h].y1+d.byHead[h].y2+d.byHead[h].y3>0);
+  const tableRows=[];
+  ah.forEach(h=>{const v=d.byHead[h],vals=[v.y1,v.y2,v.y3].slice(0,NY),t=vals.reduce((s,x)=>s+x,0);tableRows.push([h,...vals.map(x=>fmtN(x)),fmtN(t/NY),fmtN(t)]);});
+  const mv=[d.mgrVal.y1,d.mgrVal.y2,d.mgrVal.y3].slice(0,NY),mt=mv.reduce((s,x)=>s+x,0);
+  if(mt>0) tableRows.push([`${(d.mgr*100).toFixed(0)}% mgr multiplier`,...mv.map(x=>fmtN(x)),fmtN(mt/NY),fmtN(mt)]);
+  const bv=[d.bufVal.y1,d.bufVal.y2,d.bufVal.y3].slice(0,NY),bt=bv.reduce((s,x)=>s+x,0);
+  if(bt>0) tableRows.push([`${(d.buf*100).toFixed(0)}% buffer`,...bv.map(x=>fmtN(x)),fmtN(bt/NY),fmtN(bt)]);
+  tableRows.push(['TOTAL COSTS',...d.yrTotals.map(x=>fmtN(x)),fmtN(d.avgCost),fmtN(d.totalAll)]);
+  tableRows.push(['Beneficiaries',...d.bens.map(x=>Math.round(x).toLocaleString()),Math.round(d.totalBen/NY).toLocaleString(),Math.round(d.totalBen).toLocaleString()]);
+  tableRows.push(['Cost per beneficiary',...d.cpbY.slice(0,NY).map(x=>fmtD(x)),fmtD(d.cpbAvg),fmtD(d.cpbAvg)]);
+  if(logSet.size>0) tableRows.push([`CPB excl. ${[...logSet].join('+')}`,...d.cpbExclY.slice(0,NY).map(x=>fmtD(x)),fmtD(d.cpbExclAvg),fmtD(d.cpbExclAvg)]);
+
+  doc.autoTable({
+    startY:55, head:[['Cost head',...yrs,'Avg / year',`${NY}-year total`]], body:tableRows,
+    styles:{fontSize:8,cellPadding:3}, headStyles:{fillColor:[0,151,167],textColor:255,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[245,245,245]},
+    didParseCell:data=>{
+      if(['TOTAL COSTS','Cost per beneficiary'].includes(data.row.raw[0])) data.cell.styles.fontStyle='bold';
+      if(data.row.raw[0].startsWith('Cost per')||data.row.raw[0].startsWith('CPB excl')) data.cell.styles.textColor=[220,96,89];
+    }, margin:{left:14,right:14}
+  });
+
   doc.addPage();
-  doc.setFillColor(0,151,167);
-  doc.rect(0,0,297,18,'F');
+  doc.setFillColor(0,151,167); doc.rect(0,0,297,18,'F');
   doc.setTextColor(255,255,255); doc.setFontSize(13); doc.setFont('helvetica','bold');
   doc.text('Cost Line Items', 14, 12);
-
   doc.autoTable({
-    startY: 25,
-    head: [['Cost head','Description','Unit',`Cost/unit (${cur})`,`Units Y1`,`Cost Y1`,`Units Y2`,`Cost Y2`,`Units Y3`,`Cost Y3`]],
-    body: d.rows.map(r => [r.head, r.desc, r.unit, fmtN(r.cpu), r.u1, fmtN(r.cy1), r.u2, fmtN(r.cy2), r.u3, fmtN(r.cy3)]),
-    styles: { fontSize: 7, cellPadding: 2 },
-    headStyles: { fillColor: [0,151,167], textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [245,245,245] },
-    margin: { left: 14, right: 14 }
+    startY:25, head:[['Cost head','Description','Unit',`Monthly cost/unit (${cur})`,`Units Y1`,`Cost Y1`,`Units Y2`,`Cost Y2`,`Units Y3`,`Cost Y3`]],
+    body:d.rows.map(r=>[r.head,r.desc,r.unit,fmtN(r.cpu),r.u1,fmtN(r.cy1),r.u2,fmtN(r.cy2),r.u3,fmtN(r.cy3)]),
+    styles:{fontSize:7,cellPadding:2}, headStyles:{fillColor:[0,151,167],textColor:255,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[245,245,245]}, margin:{left:14,right:14}
   });
 
-  // Footer on all pages
-  const pageCount = doc.internal.getNumberOfPages();
-  for(let i=1; i<=pageCount; i++){
-    doc.setPage(i);
-    doc.setFontSize(7); doc.setTextColor(150,150,150); doc.setFont('helvetica','normal');
-    doc.text(`${pn} — BOTEC Estimate`, 14, 205);
-    doc.text(`Page ${i} of ${pageCount}`, 270, 205);
+  const pageCount=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i); doc.setFontSize(7); doc.setTextColor(150,150,150); doc.setFont('helvetica','normal');
+    doc.text(`${pn} — BOTEC Estimate`,14,205); doc.text(`Page ${i} of ${pageCount}`,270,205);
   }
-
   doc.save(`BOTEC_${pn.replace(/\s+/g,'_')}.pdf`);
 }
 
-// Mark unsaved on any input change
 document.addEventListener('input', () => setSaveStatus('Unsaved'));
-
-// Ctrl/Cmd+S to save
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveDocument(); }
 });
