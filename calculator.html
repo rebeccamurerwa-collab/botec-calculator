@@ -7,18 +7,63 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <nav class="navbar">
-    <div class="nav-brand">
-      <a href="index.html" class="nav-back">← Dashboard</a>
-    </div>
+
+  <!-- CREATOR NAVBAR -->
+  <nav class="navbar" id="creator-nav">
+    <div class="nav-brand"><a href="index.html" class="nav-back">← Dashboard</a></div>
     <div class="nav-centre">
       <input type="text" id="doc-title" class="doc-title-input" placeholder="Untitled BOTEC" value="Untitled BOTEC">
     </div>
     <div class="nav-right">
       <span id="save-status" class="save-status">Unsaved</span>
+      <button class="btn-ghost" onclick="toggleCommentsPanel()">
+        💬 Comments <span id="comments-badge" class="comments-badge" style="display:none">0</span>
+      </button>
+      <button class="btn-ghost" id="share-btn" onclick="shareForReview()">🔗 Share for review</button>
       <button class="btn-primary" onclick="saveDocument()">Save</button>
     </div>
   </nav>
+
+  <!-- REVIEWER NAVBAR -->
+  <nav class="navbar hidden" id="reviewer-nav">
+    <div class="nav-brand" style="font-size:13px;color:var(--text2)">👁 Review mode</div>
+    <div class="nav-centre">
+      <span id="reviewer-doc-title" style="font-weight:500;font-size:15px"></span>
+    </div>
+    <div class="nav-right">
+      <button class="btn-primary" onclick="toggleCommentsPanel()">💬 Add comment</button>
+    </div>
+  </nav>
+
+  <!-- COMMENTS PANEL -->
+  <div id="comments-panel" class="comments-panel hidden">
+    <div class="comments-header">
+      <strong>Comments</strong>
+      <button class="btn-ghost btn-sm" onclick="toggleCommentsPanel()">✕ Close</button>
+    </div>
+    <div id="comment-form-area">
+      <div class="field" style="margin-bottom:8px">
+        <label>Section</label>
+        <select id="comment-section">
+          <option>General</option><option>Project Setup</option>
+          <option>Beneficiaries</option><option>Cost Items</option><option>Results</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:8px">
+        <label>Comment</label>
+        <textarea id="comment-text" rows="3" placeholder="Enter your comment here…"></textarea>
+      </div>
+      <button class="btn-primary" onclick="submitComment()">Submit comment</button>
+    </div>
+    <hr style="margin:16px 0;border:none;border-top:0.5px solid var(--border)">
+    <div id="comments-list"></div>
+  </div>
+
+  <!-- FAB for reviewer -->
+  <button id="comments-fab" class="comments-fab hidden" onclick="toggleCommentsPanel()">💬 Comment</button>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast hidden"></div>
 
   <main class="calc-main">
     <div class="calc-card">
@@ -29,12 +74,12 @@
         <button class="tab" onclick="go('results')">4. Results &amp; export</button>
       </div>
 
-      <!-- SETUP -->
+      <!-- ===== SETUP ===== -->
       <div id="p-setup" class="pane on">
         <div class="stitle">Project information</div>
         <div class="frow f2">
-          <div class="field"><label>Project name</label><input type="text" id="projName" value=""></div>
-          <div class="field"><label>Programme / state</label><input type="text" id="programme" value=""></div>
+          <div class="field"><label>Project name</label><input type="text" id="projName"></div>
+          <div class="field"><label>Programme / state</label><input type="text" id="programme"></div>
         </div>
         <div class="frow f4">
           <div class="field"><label>Prepared by</label><input type="text" id="prepBy"></div>
@@ -73,19 +118,21 @@
         </div>
       </div>
 
-      <!-- BENEFICIARIES -->
+      <!-- ===== BENEFICIARIES ===== -->
       <div id="p-ben" class="pane">
         <div class="stitle">Beneficiary calculation</div>
-        <div class="note">Enter the number of direct beneficiaries in Year 1. If you expect the programme to reach more people each year, set an annual growth rate — Years 2 and 3 will calculate automatically.</div>
-        <div class="frow f3" style="margin-top:1.25rem">
+        <div class="note">Enter Year 1 beneficiaries. Then choose how to project Years 2 and 3 — either using an annual growth percentage, or entering each year manually.</div>
+
+        <!-- Mode toggle -->
+        <div class="mode-toggle" style="margin:1rem 0">
+          <button id="btn-mode-growth" class="mode-btn mode-active" onclick="setBenMode('growth')">% Annual growth</button>
+          <button id="btn-mode-manual" class="mode-btn" onclick="setBenMode('manual')">Manual entry per year</button>
+        </div>
+
+        <div class="frow f2" style="margin-bottom:10px">
           <div class="field">
             <label>Year 1 beneficiaries</label>
             <input type="number" id="benY1" placeholder="e.g. 115000" oninput="calcBens()">
-          </div>
-          <div class="field">
-            <label>Annual growth rate %</label>
-            <input type="number" id="benGrowth" placeholder="0" value="0" oninput="calcBens()">
-            <span style="font-size:11px;color:var(--text3);margin-top:4px;display:block">Leave at 0 if beneficiaries stay the same each year</span>
           </div>
           <div class="field">
             <label>Notes / source</label>
@@ -93,22 +140,44 @@
           </div>
         </div>
 
+        <!-- Growth mode -->
+        <div id="ben-growth-row" class="frow f2">
+          <div class="field">
+            <label>Annual growth rate %</label>
+            <input type="number" id="benGrowth" placeholder="0" value="0" oninput="calcBens()">
+            <span style="font-size:11px;color:var(--text3);margin-top:4px;display:block">Leave at 0 if beneficiaries are the same each year</span>
+          </div>
+        </div>
+
+        <!-- Manual mode -->
+        <div id="ben-manual-row" class="frow f2 hidden">
+          <div class="field">
+            <label>Year 2 beneficiaries</label>
+            <input type="number" id="benY2manual" placeholder="e.g. 125000" oninput="calcBens()">
+          </div>
+          <div class="field">
+            <label>Year 3 beneficiaries</label>
+            <input type="number" id="benY3manual" placeholder="e.g. 135000" oninput="calcBens()">
+          </div>
+        </div>
+
+        <!-- Calculated display -->
         <div style="margin-top:1.25rem;background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem">
           <div class="stitle" style="margin-bottom:1rem">Calculated beneficiaries per year</div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:1rem">
-            <div style="text-align:center;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px">
-              <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Year 1</div>
-              <div id="ben-show-1" style="font-size:26px;font-weight:600;color:var(--navy)">—</div>
+            <div class="ben-year-card">
+              <div class="ben-year-label">Year 1</div>
+              <div id="ben-show-1" class="ben-year-val">—</div>
             </div>
-            <div style="text-align:center;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px">
-              <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Year 2</div>
-              <div id="ben-show-2" style="font-size:26px;font-weight:600;color:var(--navy)">—</div>
-              <div id="ben-growth-2" style="font-size:11px;color:var(--teal);margin-top:4px"></div>
+            <div class="ben-year-card">
+              <div class="ben-year-label">Year 2</div>
+              <div id="ben-show-2" class="ben-year-val">—</div>
+              <div id="ben-growth-2" class="ben-year-growth"></div>
             </div>
-            <div style="text-align:center;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px">
-              <div style="font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Year 3</div>
-              <div id="ben-show-3" style="font-size:26px;font-weight:600;color:var(--navy)">—</div>
-              <div id="ben-growth-3" style="font-size:11px;color:var(--teal);margin-top:4px"></div>
+            <div class="ben-year-card">
+              <div class="ben-year-label">Year 3</div>
+              <div id="ben-show-3" class="ben-year-val">—</div>
+              <div id="ben-growth-3" class="ben-year-growth"></div>
             </div>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding-top:1rem;border-top:0.5px solid var(--border);font-size:14px">
@@ -118,25 +187,31 @@
         </div>
       </div>
 
-      <!-- COSTS -->
+      <!-- ===== COSTS ===== -->
       <div id="p-costs" class="pane">
         <div class="stitle">Cost line items</div>
         <div class="note">
-          <strong>How to fill this in:</strong> Each row is one type of cost. The <strong>Unit</strong> is what you are counting (e.g. one staff member, one trip, one KG of premix). The <strong>Monthly cost per unit</strong> is what that one unit costs per month. <strong>Units per year</strong> is how many of that unit are used in each year — enter 0 if not applicable. Cost for each year is calculated automatically as: Monthly cost × Units.
+          <strong>How to fill this in:</strong> Each row is one type of cost.
+          The <strong>Unit</strong> is what you are counting (e.g. one staff member, one trip, one KG).
+          <strong>Monthly cost per unit</strong> is what that one unit costs per month.
+          <strong>Units per year</strong> is how many of that unit you use in each year — leave blank if not applicable.
+          The <strong>Justification</strong> column is for you to explain the basis for each cost for your reviewer.
+          Year costs are calculated automatically.
         </div>
         <div style="overflow-x:auto">
           <table class="tbl" id="costTbl">
             <thead><tr>
-              <th style="min-width:155px">Cost head</th>
-              <th style="min-width:180px">Description <span class="ftag">what is being costed</span></th>
-              <th style="min-width:120px">Unit <span class="ftag">what 1 unit is</span></th>
-              <th style="width:110px">Monthly cost<br>per unit</th>
-              <th style="width:78px">Units<br>Year 1</th>
-              <th style="width:78px">Units<br>Year 2</th>
-              <th style="width:78px">Units<br>Year 3</th>
-              <th style="width:90px">Cost Y1</th>
-              <th style="width:90px">Cost Y2</th>
-              <th style="width:90px">Cost Y3</th>
+              <th style="min-width:145px">Cost head</th>
+              <th style="min-width:160px">Description <span class="ftag">what is being costed</span></th>
+              <th style="min-width:180px">Justification <span class="ftag">basis / source for reviewer</span></th>
+              <th style="min-width:110px">Unit <span class="ftag">what 1 unit is</span></th>
+              <th style="width:105px">Monthly cost<br>per unit</th>
+              <th style="width:72px">Units<br>Year 1</th>
+              <th style="width:72px">Units<br>Year 2</th>
+              <th style="width:72px">Units<br>Year 3</th>
+              <th style="width:85px">Cost Y1</th>
+              <th style="width:85px">Cost Y2</th>
+              <th style="width:85px">Cost Y3</th>
               <th style="width:28px"></th>
             </tr></thead>
             <tbody id="costBody"></tbody>
@@ -156,7 +231,7 @@
         </div>
       </div>
 
-      <!-- RESULTS -->
+      <!-- ===== RESULTS ===== -->
       <div id="p-results" class="pane">
         <div class="stitle">Summary</div>
         <div class="cards" id="summCards"></div>
@@ -176,6 +251,7 @@
           <button class="dlbtn" onclick="dlJSON()">↓ JSON</button>
         </div>
       </div>
+
     </div>
   </main>
 
