@@ -14,11 +14,36 @@
     </div>
     <div class="nav-right">
       <span id="nav-user" class="nav-user"></span>
+      <button class="icon-btn" onclick="toggleNotifPanel()" title="Notifications">
+        🔔<span id="notif-badge" class="notif-badge" style="display:none">0</span>
+      </button>
       <button class="btn-ghost" onclick="handleSignOut()">Sign out</button>
     </div>
   </nav>
 
+  <!-- Notifications panel -->
+  <div id="notif-panel" class="side-panel hidden">
+    <div class="panel-header">
+      <strong>Notifications</strong>
+      <button class="btn-ghost btn-sm" onclick="toggleNotifPanel()">✕</button>
+    </div>
+    <div id="notif-list" style="overflow-y:auto;flex:1"></div>
+  </div>
+
   <main class="dashboard-main">
+
+    <!-- Assigned for review section -->
+    <div id="review-section" class="hidden" style="margin-bottom:32px">
+      <div class="dashboard-header" style="margin-bottom:14px">
+        <div>
+          <h2>Assigned for your review</h2>
+          <p class="muted">Documents where you are the designated reviewer</p>
+        </div>
+      </div>
+      <div id="review-grid" class="docs-grid"></div>
+    </div>
+
+    <!-- My documents -->
     <div class="dashboard-header">
       <div>
         <h2>Your BOTEC documents</h2>
@@ -28,17 +53,14 @@
     </div>
 
     <div id="docs-loading" class="loading-state">
-      <div class="spinner"></div>
-      <span>Loading documents…</span>
+      <div class="spinner"></div><span>Loading documents…</span>
     </div>
-
     <div id="docs-empty" class="empty-state hidden">
       <div class="empty-icon">📋</div>
       <h3>No documents yet</h3>
       <p>Create your first BOTEC estimate to get started.</p>
       <button class="btn-primary" onclick="newDocument()">Create BOTEC</button>
     </div>
-
     <div id="docs-grid" class="docs-grid hidden"></div>
   </main>
 
@@ -65,71 +87,133 @@
       if (!session) { window.location.href = 'login.html'; return; }
       currentUser = session.user;
       document.getElementById('nav-user').textContent = currentUser.user_metadata?.full_name || currentUser.email;
-      loadDocuments();
+      await Promise.all([loadDocuments(), loadReviewAssignments(), loadNotifications()]);
+
+      // Real-time notifications
+      sb.channel('notif-dash-' + currentUser.id)
+        .on('postgres_changes', { event:'INSERT', schema:'public', table:'notifications', filter:`user_id=eq.${currentUser.id}` },
+          () => loadNotifications())
+        .subscribe();
     }
 
-    async function loadDocuments() {
-      const { data, error } = await sb
-        .from('botec_documents')
-        .select('id, name, programme, created_at, updated_at, data')
-        .order('updated_at', { ascending: false });
+    // ── Notifications ──────────────────────────────────────────
+    async function loadNotifications() {
+      const { data } = await sb.from('notifications').select('*')
+        .eq('user_id', currentUser.id).order('created_at', { ascending:false }).limit(20);
+      if (!data) return;
+      const unread = data.filter(n => !n.read).length;
+      const badge  = document.getElementById('notif-badge');
+      badge.textContent  = unread;
+      badge.style.display = unread > 0 ? 'flex' : 'none';
 
-      document.getElementById('docs-loading').classList.add('hidden');
+      const el = document.getElementById('notif-list');
+      if (!data.length) { el.innerHTML = '<p class="empty-notif" style="padding:16px">No notifications yet.</p>'; return; }
+      el.innerHTML = data.map(n => `
+        <div class="notif-item ${n.read?'read':'unread'}" onclick="openNotif('${n.id}','${n.doc_id||''}')">
+          <div class="notif-icon">${n.type==='review_requested'?'📋':n.type==='comment_added'?'💬':'✅'}</div>
+          <div class="notif-body">
+            <p class="notif-msg">${n.message}</p>
+            <p class="notif-time">${new Date(n.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</p>
+          </div>
+          ${!n.read?'<div class="notif-dot"></div>':''}
+        </div>`).join('');
+    }
 
-      if (error) { alert('Failed to load documents: ' + error.message); return; }
+    async function openNotif(notifId, docId) {
+      await sb.from('notifications').update({ read:true }).eq('id', notifId);
+      toggleNotifPanel();
+      if (docId) window.location.href = `calculator.html?id=${docId}`;
+    }
 
-      if (!data || data.length === 0) {
-        document.getElementById('docs-empty').classList.remove('hidden');
-        return;
-      }
+    function toggleNotifPanel() {
+      document.getElementById('notif-panel').classList.toggle('hidden');
+    }
 
-      document.getElementById('docs-grid').classList.remove('hidden');
-      document.getElementById('docs-grid').innerHTML = data.map(doc => {
-        const cpb = doc.data?.cpbAvg != null ? `₹${parseFloat(doc.data.cpbAvg).toFixed(2)}` : '—';
-        const totalBen = doc.data?.totalBen != null ? parseInt(doc.data.totalBen).toLocaleString() : '—';
-        const updated = new Date(doc.updated_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
-        return `
-          <div class="doc-card" onclick="openDocument('${doc.id}')">
-            <div class="doc-card-header">
-              <div class="doc-icon">B</div>
-              <div class="doc-meta">
-                <span class="doc-updated">Updated ${updated}</span>
-                ${doc.programme ? `<span class="doc-programme">${doc.programme}</span>` : ''}
-              </div>
+    // ── Review assignments ─────────────────────────────────────
+    async function loadReviewAssignments() {
+      const { data } = await sb.from('botec_documents')
+        .select('id,name,programme,reviewer_status,data,updated_at,profiles:user_id(full_name,email)')
+        .eq('reviewer_id', currentUser.id)
+        .neq('reviewer_status', 'none');
+      if (!data || !data.length) return;
+
+      document.getElementById('review-section').classList.remove('hidden');
+      const statusLabel = { requested:'Review requested', in_review:'In review', complete:'Review complete' };
+      const statusClass = { requested:'status-requested', in_review:'status-in_review', complete:'status-complete' };
+
+      document.getElementById('review-grid').innerHTML = data.map(doc => {
+        const owner = doc.profiles?.full_name || doc.profiles?.email || 'Unknown';
+        const updated = new Date(doc.updated_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+        return `<div class="doc-card" onclick="window.location.href='calculator.html?id=${doc.id}'">
+          <div class="doc-card-header">
+            <div class="doc-icon" style="background:#0097a7">R</div>
+            <div class="doc-meta">
+              <span class="doc-updated">From ${owner}</span>
+              <span class="doc-updated">Updated ${updated}</span>
             </div>
-            <h3 class="doc-name">${doc.name}</h3>
-            <div class="doc-stats">
-              <div class="doc-stat"><span class="stat-label">CPB (avg)</span><span class="stat-val">${cpb}</span></div>
-              <div class="doc-stat"><span class="stat-label">Beneficiaries</span><span class="stat-val">${totalBen}</span></div>
-            </div>
-            <div class="doc-actions" onclick="event.stopPropagation()">
-              <button class="btn-ghost btn-sm" onclick="openDocument('${doc.id}')">Open</button>
-              <button class="btn-ghost btn-sm" onclick="duplicateDocument('${doc.id}', '${doc.name.replace(/'/g,"\\'")}')">Duplicate</button>
-              <button class="btn-ghost btn-sm danger" onclick="promptDelete('${doc.id}', '${doc.name.replace(/'/g,"\\'")}')">Delete</button>
-            </div>
-          </div>`;
+          </div>
+          <h3 class="doc-name">${doc.name}</h3>
+          <div style="margin-bottom:12px">
+            <span class="reviewer-badge ${statusClass[doc.reviewer_status]||''}">${statusLabel[doc.reviewer_status]||doc.reviewer_status}</span>
+          </div>
+          <div class="doc-actions" onclick="event.stopPropagation()">
+            <button class="btn-ghost btn-sm" onclick="window.location.href='calculator.html?id=${doc.id}'">Open to review</button>
+          </div>
+        </div>`;
       }).join('');
     }
 
-    function newDocument() {
-      window.location.href = 'calculator.html';
+    // ── My documents ───────────────────────────────────────────
+    async function loadDocuments() {
+      const { data, error } = await sb.from('botec_documents')
+        .select('id,name,programme,created_at,updated_at,data,reviewer_status,profiles:reviewer_id(full_name,email)')
+        .eq('user_id', currentUser.id)
+        .order('updated_at', { ascending:false });
+
+      document.getElementById('docs-loading').classList.add('hidden');
+      if (error) { alert('Failed to load documents: ' + error.message); return; }
+      if (!data || !data.length) { document.getElementById('docs-empty').classList.remove('hidden'); return; }
+
+      document.getElementById('docs-grid').classList.remove('hidden');
+      const statusLabel = { none:'', requested:'Review requested', in_review:'In review', complete:'Review complete ✓' };
+      const statusClass = { requested:'status-requested', in_review:'status-in_review', complete:'status-complete' };
+
+      document.getElementById('docs-grid').innerHTML = data.map(doc => {
+        const cpb     = doc.data?.cpbAvg != null ? `₹${parseFloat(doc.data.cpbAvg).toFixed(2)}` : '—';
+        const totalBen= doc.data?.totalBen != null ? parseInt(doc.data.totalBen).toLocaleString() : '—';
+        const updated = new Date(doc.updated_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+        const reviewer= doc.profiles ? (doc.profiles.full_name || doc.profiles.email) : null;
+        return `<div class="doc-card" onclick="openDocument('${doc.id}')">
+          <div class="doc-card-header">
+            <div class="doc-icon">B</div>
+            <div class="doc-meta">
+              <span class="doc-updated">Updated ${updated}</span>
+              ${doc.programme?`<span class="doc-programme">${doc.programme}</span>`:''}
+            </div>
+          </div>
+          <h3 class="doc-name">${doc.name}</h3>
+          ${reviewer&&doc.reviewer_status!=='none'?`<div style="margin-bottom:8px;font-size:12px"><span class="reviewer-badge ${statusClass[doc.reviewer_status]||''}">${reviewer} — ${statusLabel[doc.reviewer_status]}</span></div>`:''}
+          <div class="doc-stats">
+            <div class="doc-stat"><span class="stat-label">CPB (avg)</span><span class="stat-val">${cpb}</span></div>
+            <div class="doc-stat"><span class="stat-label">Beneficiaries</span><span class="stat-val">${totalBen}</span></div>
+          </div>
+          <div class="doc-actions" onclick="event.stopPropagation()">
+            <button class="btn-ghost btn-sm" onclick="openDocument('${doc.id}')">Open</button>
+            <button class="btn-ghost btn-sm" onclick="duplicateDocument('${doc.id}','${doc.name.replace(/'/g,"\\'")}')">Duplicate</button>
+            <button class="btn-ghost btn-sm danger" onclick="promptDelete('${doc.id}','${doc.name.replace(/'/g,"\\'")}')">Delete</button>
+          </div>
+        </div>`;
+      }).join('');
     }
 
-    function openDocument(id) {
-      window.location.href = `calculator.html?id=${id}`;
-    }
+    function newDocument() { window.location.href = 'calculator.html'; }
+    function openDocument(id) { window.location.href = `calculator.html?id=${id}`; }
 
     async function duplicateDocument(id, name) {
       const { data, error } = await sb.from('botec_documents').select('*').eq('id', id).single();
       if (error) { alert('Error: ' + error.message); return; }
-      const { error: insertErr } = await sb.from('botec_documents').insert({
-        user_id: currentUser.id,
-        name: 'Copy of ' + data.name,
-        programme: data.programme,
-        data: data.data
-      });
-      if (insertErr) alert('Error duplicating: ' + insertErr.message);
-      else loadDocuments();
+      await sb.from('botec_documents').insert({ user_id:currentUser.id, name:'Copy of '+data.name, programme:data.programme, data:data.data });
+      loadDocuments();
     }
 
     function promptDelete(id, name) {
@@ -137,22 +221,14 @@
       document.getElementById('delete-doc-name').textContent = name;
       document.getElementById('delete-modal').classList.remove('hidden');
     }
-    function closeDeleteModal() {
-      deleteTargetId = null;
-      document.getElementById('delete-modal').classList.add('hidden');
-    }
+    function closeDeleteModal() { deleteTargetId=null; document.getElementById('delete-modal').classList.add('hidden'); }
     async function confirmDelete() {
       if (!deleteTargetId) return;
-      const { error } = await sb.from('botec_documents').delete().eq('id', deleteTargetId);
-      closeDeleteModal();
-      if (error) alert('Error deleting: ' + error.message);
-      else loadDocuments();
+      await sb.from('botec_documents').delete().eq('id', deleteTargetId);
+      closeDeleteModal(); loadDocuments();
     }
 
-    async function handleSignOut() {
-      await sb.auth.signOut();
-      window.location.href = 'login.html';
-    }
+    async function handleSignOut() { await sb.auth.signOut(); window.location.href = 'login.html'; }
 
     init();
   </script>
