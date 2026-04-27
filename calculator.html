@@ -8,259 +8,301 @@
 </head>
 <body>
 
-  <!-- CREATOR NAVBAR -->
-  <nav class="navbar" id="creator-nav">
-    <div class="nav-brand"><a href="index.html" class="nav-back">← Dashboard</a></div>
-    <div class="nav-centre">
-      <input type="text" id="doc-title" class="doc-title-input" placeholder="Untitled BOTEC" value="Untitled BOTEC">
-    </div>
-    <div class="nav-right">
-      <span id="save-status" class="save-status">Unsaved</span>
-      <button class="btn-ghost" onclick="toggleCommentsPanel()">
-        💬 Comments <span id="comments-badge" class="comments-badge" style="display:none">0</span>
-      </button>
-      <button class="btn-ghost" id="share-btn" onclick="shareForReview()">🔗 Share for review</button>
-      <button class="btn-primary" onclick="saveDocument()">Save</button>
-    </div>
-  </nav>
+<nav class="navbar">
+  <div class="nav-brand"><a href="index.html" class="nav-back">← Dashboard</a></div>
+  <div class="nav-centre">
+    <input type="text" id="doc-title" class="doc-title-input" placeholder="Untitled BOTEC" value="Untitled BOTEC">
+  </div>
+  <div class="nav-right">
+    <span id="reviewer-badge" class="reviewer-badge hidden"></span>
+    <span id="save-status" class="save-status">Unsaved</span>
 
-  <!-- REVIEWER NAVBAR -->
-  <nav class="navbar hidden" id="reviewer-nav">
-    <div class="nav-brand" style="font-size:13px;color:var(--text2)">👁 Review mode</div>
-    <div class="nav-centre">
-      <span id="reviewer-doc-title" style="font-weight:500;font-size:15px"></span>
-    </div>
-    <div class="nav-right">
-      <button class="btn-primary" onclick="toggleCommentsPanel()">💬 Add comment</button>
-    </div>
-  </nav>
+    <!-- Notifications bell -->
+    <button class="icon-btn" onclick="toggleNotifPanel()" title="Notifications">
+      🔔<span id="notif-badge" class="notif-badge" style="display:none">0</span>
+    </button>
 
-  <!-- COMMENTS PANEL -->
-  <div id="comments-panel" class="comments-panel hidden">
-    <div class="comments-header">
-      <strong>Comments</strong>
-      <button class="btn-ghost btn-sm" onclick="toggleCommentsPanel()">✕ Close</button>
+    <!-- Comments -->
+    <button class="btn-ghost" onclick="toggleCommentsPanel()">
+      💬 Comments<span id="comments-badge" class="comments-badge" style="display:none">0</span>
+    </button>
+
+    <!-- Reviewer -->
+    <button class="btn-ghost" id="reviewer-btn" onclick="toggleReviewerPanel()">👤 Reviewer</button>
+
+    <button class="btn-primary" id="save-btn" onclick="saveDocument()">Save</button>
+  </div>
+</nav>
+
+<!-- Reviewer mode bar (shown to reviewers only) -->
+<div id="reviewer-mode-bar" class="reviewer-mode-bar hidden">
+  <span>👁 You are reviewing this document. It is read-only. Leave comments using the button above.</span>
+  <button class="btn-primary btn-sm" onclick="markReviewComplete()">✓ Mark review complete</button>
+</div>
+
+<!-- Notification panel -->
+<div id="notif-panel" class="side-panel hidden">
+  <div class="panel-header">
+    <strong>Notifications</strong>
+    <button class="btn-ghost btn-sm" onclick="toggleNotifPanel()">✕</button>
+  </div>
+  <div id="notif-list"></div>
+</div>
+
+<!-- Reviewer selection panel -->
+<div id="reviewer-panel" class="side-panel hidden">
+  <div class="panel-header">
+    <strong>Assign reviewer</strong>
+    <button class="btn-ghost btn-sm" onclick="toggleReviewerPanel()">✕</button>
+  </div>
+  <div class="panel-body">
+    <div class="stitle" style="margin-bottom:8px">Current reviewer</div>
+    <div id="current-reviewer-info"><p style="font-size:13px;color:var(--text3)">No reviewer assigned yet.</p></div>
+    <hr style="margin:14px 0;border:none;border-top:0.5px solid var(--border)">
+    <div class="stitle" style="margin-bottom:8px">Search by email</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input type="text" id="reviewer-search-input" placeholder="colleague@organisation.org" style="flex:1" oninput="searchReviewer()">
     </div>
-    <div id="comment-form-area">
-      <div class="field" style="margin-bottom:8px">
-        <label>Section</label>
-        <select id="comment-section">
-          <option>General</option><option>Project Setup</option>
-          <option>Beneficiaries</option><option>Cost Items</option><option>Results</option>
-        </select>
-      </div>
-      <div class="field" style="margin-bottom:8px">
-        <label>Comment</label>
-        <textarea id="comment-text" rows="3" placeholder="Enter your comment here…"></textarea>
-      </div>
-      <button class="btn-primary" onclick="submitComment()">Submit comment</button>
+    <div id="reviewer-search-results"></div>
+    <div class="note" style="margin-top:12px">The reviewer must have an account. They will receive a notification and can view the document and leave comments.</div>
+  </div>
+</div>
+
+<!-- Comments panel -->
+<div id="comments-panel" class="side-panel hidden">
+  <div class="panel-header">
+    <strong>Comments</strong>
+    <button class="btn-ghost btn-sm" onclick="toggleCommentsPanel()">✕</button>
+  </div>
+  <div class="panel-body">
+    <div class="field" style="margin-bottom:8px">
+      <label>Section</label>
+      <select id="comment-section">
+        <option>General</option><option>Project Setup</option>
+        <option>Beneficiaries</option><option>Cost Items</option><option>Results</option>
+      </select>
     </div>
-    <hr style="margin:16px 0;border:none;border-top:0.5px solid var(--border)">
+    <div class="field" style="margin-bottom:10px">
+      <label>Comment</label>
+      <textarea id="comment-text" rows="3" placeholder="Enter your comment…"></textarea>
+    </div>
+    <button class="btn-primary" onclick="submitComment()">Submit comment</button>
+    <hr style="margin:14px 0;border:none;border-top:0.5px solid var(--border)">
     <div id="comments-list"></div>
   </div>
+</div>
 
-  <!-- FAB for reviewer -->
-  <button id="comments-fab" class="comments-fab hidden" onclick="toggleCommentsPanel()">💬 Comment</button>
+<div id="toast" class="toast hidden"></div>
 
-  <!-- TOAST -->
-  <div id="toast" class="toast hidden"></div>
-
-  <main class="calc-main">
-    <div class="calc-card">
-      <div class="tabs">
-        <button class="tab on" onclick="go('setup')">1. Project</button>
-        <button class="tab" onclick="go('ben')">2. Beneficiaries</button>
-        <button class="tab" onclick="go('costs')">3. Cost items</button>
-        <button class="tab" onclick="go('results')">4. Results &amp; export</button>
-      </div>
-
-      <!-- ===== SETUP ===== -->
-      <div id="p-setup" class="pane on">
-        <div class="stitle">Project information</div>
-        <div class="frow f2">
-          <div class="field"><label>Project name</label><input type="text" id="projName"></div>
-          <div class="field"><label>Programme / state</label><input type="text" id="programme"></div>
-        </div>
-        <div class="frow f4">
-          <div class="field"><label>Prepared by</label><input type="text" id="prepBy"></div>
-          <div class="field"><label>Preparation date</label><input type="text" id="prepDate"></div>
-          <div class="field"><label>Reviewed by</label><input type="text" id="reviewBy"></div>
-          <div class="field"><label>Review date</label><input type="text" id="reviewDate"></div>
-        </div>
-        <div class="frow f2">
-          <div class="field"><label>Currency</label>
-            <select id="currency" onchange="calcAll()">
-              <option value="INR">INR (₹)</option><option value="USD">USD ($)</option>
-              <option value="GBP">GBP (£)</option><option value="EUR">EUR (€)</option>
-            </select>
-          </div>
-          <div class="field"><label>Number of project years</label>
-            <select id="numYears" onchange="calcAll()">
-              <option value="3" selected>3 years</option><option value="2">2 years</option><option value="1">1 year</option>
-            </select>
-          </div>
-        </div>
-        <div class="frow f2">
-          <div class="field"><label>Buffer / contingency % <span class="ftag">applied to all sub-costs</span></label>
-            <input type="number" id="bufferPct" value="15" min="0" max="100" oninput="calcAll()">
-          </div>
-          <div class="field"><label>Managerial cost multiplier % <span class="ftag">% of Internal Consulting</span></label>
-            <input type="number" id="mgrMult" value="25" min="0" max="100" oninput="calcAll()">
-          </div>
-        </div>
-        <div class="field" style="margin-top:10px">
-          <label>Purpose / notes</label>
-          <textarea id="purposeNote" rows="3"></textarea>
-        </div>
-        <div style="margin-top:14px">
-          <div class="stitle" style="margin-bottom:6px">Logistics cost heads <span class="ftag">used for CPB-excluding-logistics row</span></div>
-          <div id="logFlags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-        </div>
-      </div>
-
-      <!-- ===== BENEFICIARIES ===== -->
-      <div id="p-ben" class="pane">
-        <div class="stitle">Beneficiary calculation</div>
-        <div class="note">Enter Year 1 beneficiaries. Then choose how to project Years 2 and 3 — either using an annual growth percentage, or entering each year manually.</div>
-
-        <!-- Mode toggle -->
-        <div class="mode-toggle" style="margin:1rem 0">
-          <button id="btn-mode-growth" class="mode-btn mode-active" onclick="setBenMode('growth')">% Annual growth</button>
-          <button id="btn-mode-manual" class="mode-btn" onclick="setBenMode('manual')">Manual entry per year</button>
-        </div>
-
-        <div class="frow f2" style="margin-bottom:10px">
-          <div class="field">
-            <label>Year 1 beneficiaries</label>
-            <input type="number" id="benY1" placeholder="e.g. 115000" oninput="calcBens()">
-          </div>
-          <div class="field">
-            <label>Notes / source</label>
-            <input type="text" id="benNotes" placeholder="e.g. Based on district census data">
-          </div>
-        </div>
-
-        <!-- Growth mode -->
-        <div id="ben-growth-row" class="frow f2">
-          <div class="field">
-            <label>Annual growth rate %</label>
-            <input type="number" id="benGrowth" placeholder="0" value="0" oninput="calcBens()">
-            <span style="font-size:11px;color:var(--text3);margin-top:4px;display:block">Leave at 0 if beneficiaries are the same each year</span>
-          </div>
-        </div>
-
-        <!-- Manual mode -->
-        <div id="ben-manual-row" class="frow f2 hidden">
-          <div class="field">
-            <label>Year 2 beneficiaries</label>
-            <input type="number" id="benY2manual" placeholder="e.g. 125000" oninput="calcBens()">
-          </div>
-          <div class="field">
-            <label>Year 3 beneficiaries</label>
-            <input type="number" id="benY3manual" placeholder="e.g. 135000" oninput="calcBens()">
-          </div>
-        </div>
-
-        <!-- Calculated display -->
-        <div style="margin-top:1.25rem;background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem">
-          <div class="stitle" style="margin-bottom:1rem">Calculated beneficiaries per year</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:1rem">
-            <div class="ben-year-card">
-              <div class="ben-year-label">Year 1</div>
-              <div id="ben-show-1" class="ben-year-val">—</div>
-            </div>
-            <div class="ben-year-card">
-              <div class="ben-year-label">Year 2</div>
-              <div id="ben-show-2" class="ben-year-val">—</div>
-              <div id="ben-growth-2" class="ben-year-growth"></div>
-            </div>
-            <div class="ben-year-card">
-              <div class="ben-year-label">Year 3</div>
-              <div id="ben-show-3" class="ben-year-val">—</div>
-              <div id="ben-growth-3" class="ben-year-growth"></div>
-            </div>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:1rem;border-top:0.5px solid var(--border);font-size:14px">
-            <span style="color:var(--text2)">Total beneficiaries across all years</span>
-            <span id="ben-total" style="font-weight:600;font-size:16px">—</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== COSTS ===== -->
-      <div id="p-costs" class="pane">
-        <div class="stitle">Cost line items</div>
-        <div class="note">
-          <strong>How to fill this in:</strong> Each row is one type of cost.
-          The <strong>Unit</strong> is what you are counting (e.g. one staff member, one trip, one KG).
-          <strong>Monthly cost per unit</strong> is what that one unit costs per month.
-          <strong>Units per year</strong> is how many of that unit you use in each year — leave blank if not applicable.
-          The <strong>Justification</strong> column is for you to explain the basis for each cost for your reviewer.
-          Year costs are calculated automatically.
-        </div>
-        <div style="overflow-x:auto">
-          <table class="tbl" id="costTbl">
-            <thead><tr>
-              <th style="min-width:145px">Cost head</th>
-              <th style="min-width:160px">Description <span class="ftag">what is being costed</span></th>
-              <th style="min-width:180px">Justification <span class="ftag">basis / source for reviewer</span></th>
-              <th style="min-width:110px">Unit <span class="ftag">what 1 unit is</span></th>
-              <th style="width:105px">Monthly cost<br>per unit</th>
-              <th style="width:72px">Units<br>Year 1</th>
-              <th style="width:72px">Units<br>Year 2</th>
-              <th style="width:72px">Units<br>Year 3</th>
-              <th style="width:85px">Cost Y1</th>
-              <th style="width:85px">Cost Y2</th>
-              <th style="width:85px">Cost Y3</th>
-              <th style="width:28px"></th>
-            </tr></thead>
-            <tbody id="costBody"></tbody>
-          </table>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
-          <button class="addbtn" onclick="addCost()">+ Blank row</button>
-          <button class="addbtn" onclick="preset('c1')">+ Partnerships Manager</button>
-          <button class="addbtn" onclick="preset('c2')">+ Sr. Partnerships Officer</button>
-          <button class="addbtn" onclick="preset('travel')">+ Travel</button>
-          <button class="addbtn" onclick="preset('premix')">+ Premix</button>
-          <button class="addbtn" onclick="preset('equip')">+ Equipment</button>
-          <button class="addbtn" onclick="preset('mae')">+ M&amp;E</button>
-          <button class="addbtn" onclick="preset('transport')">+ Transportation</button>
-          <button class="addbtn" onclick="preset('grinding')">+ Grinding</button>
-          <button class="addbtn" onclick="preset('packaging')">+ Packaging</button>
-        </div>
-      </div>
-
-      <!-- ===== RESULTS ===== -->
-      <div id="p-results" class="pane">
-        <div class="stitle">Summary</div>
-        <div class="cards" id="summCards"></div>
-        <div style="overflow-x:auto">
-          <table class="tbl" id="summTbl" style="margin-bottom:1.5rem">
-            <thead><tr id="summHead"></tr></thead>
-            <tbody id="summBody"></tbody>
-          </table>
-        </div>
-        <div style="height:280px;position:relative;margin-bottom:1.5rem">
-          <canvas id="chartC"></canvas>
-        </div>
-        <div>
-          <button class="dlbtn" onclick="dlCSV()">↓ CSV</button>
-          <button class="dlbtn" onclick="dlXLSX()">↓ Excel (.xlsx)</button>
-          <button class="dlbtn" onclick="dlPDF()">↓ PDF</button>
-          <button class="dlbtn" onclick="dlJSON()">↓ JSON</button>
-        </div>
-      </div>
-
+<main class="calc-main">
+  <div class="calc-card">
+    <div class="tabs">
+      <button class="tab on" onclick="go('setup')">1. Project</button>
+      <button class="tab" onclick="go('ben')">2. Beneficiaries</button>
+      <button class="tab" onclick="go('costs')">3. Cost items</button>
+      <button class="tab" onclick="go('results')">4. Results &amp; export</button>
     </div>
-  </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
-  <script src="js/supabase-client.js"></script>
-  <script src="js/calculator.js"></script>
+    <!-- ===== SETUP ===== -->
+    <div id="p-setup" class="pane on">
+      <div class="stitle">Project information</div>
+      <div class="frow f2">
+        <div class="field"><label>Project name</label><input type="text" id="projName"></div>
+        <div class="field"><label>Programme / state</label><input type="text" id="programme"></div>
+      </div>
+      <div class="frow f4">
+        <div class="field"><label>Prepared by</label><input type="text" id="prepBy"></div>
+        <div class="field"><label>Preparation date</label><input type="text" id="prepDate"></div>
+        <div class="field"><label>Reviewed by</label><input type="text" id="reviewBy"></div>
+        <div class="field"><label>Review date</label><input type="text" id="reviewDate"></div>
+      </div>
+      <div class="frow f2">
+        <div class="field"><label>Currency</label>
+          <select id="currency" onchange="calcAll()">
+            <option value="INR">INR (₹)</option><option value="USD">USD ($)</option>
+            <option value="GBP">GBP (£)</option><option value="EUR">EUR (€)</option>
+          </select>
+        </div>
+        <div class="field"><label>Number of project years</label>
+          <select id="numYears" onchange="calcAll()">
+            <option value="3" selected>3 years</option><option value="2">2 years</option><option value="1">1 year</option>
+          </select>
+        </div>
+      </div>
+      <div class="frow f2">
+        <div class="field"><label>Buffer / contingency % <span class="ftag">applied to all sub-costs</span></label>
+          <input type="number" id="bufferPct" value="15" min="0" max="100" oninput="calcAll()">
+        </div>
+        <div class="field"><label>Managerial cost multiplier % <span class="ftag">% of Internal Consulting</span></label>
+          <input type="number" id="mgrMult" value="25" min="0" max="100" oninput="calcAll()">
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>Purpose / notes</label>
+        <textarea id="purposeNote" rows="3"></textarea>
+      </div>
+      <div style="margin-top:14px">
+        <div class="stitle" style="margin-bottom:6px">Logistics cost heads <span class="ftag">for CPB-excluding-logistics row</span></div>
+        <div id="logFlags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+    </div>
+
+    <!-- ===== BENEFICIARIES ===== -->
+    <div id="p-ben" class="pane">
+      <div class="stitle">Beneficiary calculation</div>
+      <div class="note">Enter Year 1 beneficiaries. Choose growth % or manual entry for Years 2 and 3.</div>
+      <div class="mode-toggle" style="margin:1rem 0">
+        <button id="btn-mode-growth" class="mode-btn mode-active" onclick="setBenMode('growth')">% Annual growth</button>
+        <button id="btn-mode-manual" class="mode-btn" onclick="setBenMode('manual')">Manual entry per year</button>
+      </div>
+      <div class="frow f2" style="margin-bottom:10px">
+        <div class="field"><label>Year 1 beneficiaries</label><input type="number" id="benY1" placeholder="e.g. 768750" oninput="calcBens()"></div>
+        <div class="field"><label>Notes / source</label><input type="text" id="benNotes" placeholder="e.g. District census data"></div>
+      </div>
+      <div id="ben-growth-row" class="frow f2">
+        <div class="field">
+          <label>Annual growth rate %</label>
+          <input type="number" id="benGrowth" value="0" oninput="calcBens()">
+          <span style="font-size:11px;color:var(--text3);margin-top:4px;display:block">Leave at 0 if beneficiaries stay the same each year</span>
+        </div>
+      </div>
+      <div id="ben-manual-row" class="frow f2 hidden">
+        <div class="field"><label>Year 2 beneficiaries</label><input type="number" id="benY2manual" oninput="calcBens()"></div>
+        <div class="field"><label>Year 3 beneficiaries</label><input type="number" id="benY3manual" oninput="calcBens()"></div>
+      </div>
+      <div style="margin-top:1.25rem;background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem 1.5rem">
+        <div class="stitle" style="margin-bottom:1rem">Calculated beneficiaries per year</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:1rem">
+          <div class="ben-year-card"><div class="ben-year-label">Year 1</div><div id="ben-show-1" class="ben-year-val">—</div></div>
+          <div class="ben-year-card"><div class="ben-year-label">Year 2</div><div id="ben-show-2" class="ben-year-val">—</div><div id="ben-growth-2" class="ben-year-growth"></div></div>
+          <div class="ben-year-card"><div class="ben-year-label">Year 3</div><div id="ben-show-3" class="ben-year-val">—</div><div id="ben-growth-3" class="ben-year-growth"></div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:1rem;border-top:0.5px solid var(--border);font-size:14px">
+          <span style="color:var(--text2)">Total beneficiaries across all years</span>
+          <span id="ben-total" style="font-weight:600;font-size:16px">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== COSTS ===== -->
+    <div id="p-costs" class="pane">
+      <div class="stitle">Cost items</div>
+
+      <!-- Atta consumption calculator -->
+      <div class="atta-calc-box">
+        <div class="atta-calc-header">
+          <span class="atta-calc-title">Atta consumption calculator</span>
+          <span class="ftag">auto-fills Premix, Transport, Grinding &amp; Packaging rows below</span>
+        </div>
+        <div class="atta-assumptions">
+          Fixed assumptions (MDM guidelines): <strong>125g atta per student per day</strong> · <strong>16 serving days/month</strong> (atta 4 days/week; rice the remaining 2 days) · <strong>Premix : flour ratio = 1 : 5</strong>
+        </div>
+        <div class="atta-grid">
+          <div class="atta-col-hdr"></div>
+          <div class="atta-col-hdr">Year 1</div>
+          <div class="atta-col-hdr">Year 2</div>
+          <div class="atta-col-hdr">Year 3</div>
+
+          <div class="atta-row-lbl">Daily atta consumption</div>
+          <div class="atta-val" id="atta-daily-1">—</div>
+          <div class="atta-val" id="atta-daily-2">—</div>
+          <div class="atta-val" id="atta-daily-3">—</div>
+
+          <div class="atta-row-lbl">Monthly atta</div>
+          <div class="atta-val" id="atta-monthly-1">—</div>
+          <div class="atta-val" id="atta-monthly-2">—</div>
+          <div class="atta-val" id="atta-monthly-3">—</div>
+
+          <div class="atta-row-lbl">Yearly atta (MT)</div>
+          <div class="atta-val strong" id="atta-yearly-1">—</div>
+          <div class="atta-val strong" id="atta-yearly-2">—</div>
+          <div class="atta-val strong" id="atta-yearly-3">—</div>
+
+          <div class="atta-row-lbl">Yearly atta (KG)</div>
+          <div class="atta-val strong teal" id="atta-kg-1">—</div>
+          <div class="atta-val strong teal" id="atta-kg-2">—</div>
+          <div class="atta-val strong teal" id="atta-kg-3">—</div>
+
+          <div class="atta-row-lbl">Premix KG (÷5)</div>
+          <div class="atta-val teal" id="atta-premix-1">—</div>
+          <div class="atta-val teal" id="atta-premix-2">—</div>
+          <div class="atta-val teal" id="atta-premix-3">—</div>
+        </div>
+        <div class="atta-note">Beneficiary numbers are linked automatically from the Beneficiaries tab. ↑ These figures update instantly when beneficiaries change.</div>
+      </div>
+
+      <div class="note" style="margin-top:12px">
+        <strong>How to fill in cost items:</strong>
+        The <strong>Unit</strong> is what you are counting (e.g. one person-month, one device). <strong>Monthly cost per unit</strong> is what one unit costs per month. <strong>Units per year</strong> are filled automatically for consulting and travel rows using the helpers below each row, and for atta-driven rows from the calculator above. The <strong>Justification</strong> column is for your reviewer.
+      </div>
+
+      <div style="overflow-x:auto">
+        <table class="tbl" id="costTbl">
+          <thead><tr>
+            <th style="min-width:145px">Cost head</th>
+            <th style="min-width:160px">Description</th>
+            <th style="min-width:170px">Justification <span class="ftag">for reviewer</span></th>
+            <th style="min-width:100px">Unit</th>
+            <th style="width:100px">Monthly cost<br>per unit</th>
+            <th style="width:70px">Units Y1</th>
+            <th style="width:70px">Units Y2</th>
+            <th style="width:70px">Units Y3</th>
+            <th style="width:82px">Cost Y1</th>
+            <th style="width:82px">Cost Y2</th>
+            <th style="width:82px">Cost Y3</th>
+            <th style="width:28px"></th>
+          </tr></thead>
+          <tbody id="costBody"></tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+        <button class="addbtn" onclick="addCost()">+ Blank row</button>
+        <button class="addbtn" onclick="preset('c1')">+ Partnerships Manager</button>
+        <button class="addbtn" onclick="preset('c2')">+ Sr. Partnerships Officer</button>
+        <button class="addbtn" onclick="preset('c3')">+ Sr. Programs Officer</button>
+        <button class="addbtn" onclick="preset('travel')">+ Travel PM</button>
+        <button class="addbtn" onclick="preset('travel2')">+ Travel Sr. Partnerships Officer</button>
+        <button class="addbtn" onclick="preset('travel3')">+ Travel Sr. Programs Officer</button>
+        <button class="addbtn" onclick="preset('premix')">+ Premix</button>
+        <button class="addbtn" onclick="preset('equip')">+ Equipment</button>
+        <button class="addbtn" onclick="preset('nabl')">+ NABL testing</button>
+        <button class="addbtn" onclick="preset('icheck')">+ I-check testing</button>
+        <button class="addbtn" onclick="preset('ironspot')">+ Iron spot kit</button>
+        <button class="addbtn" onclick="preset('transport')">+ Transportation</button>
+        <button class="addbtn" onclick="preset('grinding')">+ Grinding</button>
+        <button class="addbtn" onclick="preset('packaging')">+ Packaging</button>
+        <button class="addbtn" onclick="preset('event')">+ Event / Admin</button>
+      </div>
+    </div>
+
+    <!-- ===== RESULTS ===== -->
+    <div id="p-results" class="pane">
+      <div class="stitle">Summary</div>
+      <div class="cards" id="summCards"></div>
+      <div style="overflow-x:auto">
+        <table class="tbl" style="margin-bottom:1.5rem">
+          <thead><tr id="summHead"></tr></thead>
+          <tbody id="summBody"></tbody>
+        </table>
+      </div>
+      <div style="height:280px;position:relative;margin-bottom:1.5rem"><canvas id="chartC"></canvas></div>
+      <div>
+        <button class="dlbtn" onclick="dlCSV()">↓ CSV</button>
+        <button class="dlbtn" onclick="dlXLSX()">↓ Excel (.xlsx)</button>
+        <button class="dlbtn" onclick="dlPDF()">↓ PDF</button>
+        <button class="dlbtn" onclick="dlJSON()">↓ JSON</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/calculator.js"></script>
 </body>
 </html>
