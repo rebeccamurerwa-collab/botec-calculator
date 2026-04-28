@@ -18,12 +18,9 @@ const PRESETS = {
                guide:'Enter months travelling per year and number of people.' },
   premix:    { h:'Premix Costs',        d:'NaFeEDTA premix',               u:'KG',           cpu:400,    attaType:'premix',
                guide:'Auto-calculated from atta consumption (yearly MT ÷ 5). Ratio of premix to flour is 1:5.' },
-  equip:     { h:'Equipment Costs',     d:'Microdoser',                    u:'Device',       cpu:200000,
-               guide:'Enter number of devices for Year 1. Years 2 and 3 are typically 0.' },
-  nabl:      { h:'M&E Costs',           d:'NABL testing',                  u:'Test',         cpu:4000,
-               guide:'E.g. 5 mills × 2 tests/year = 10. Enter total tests per year.' },
-  icheck:    { h:'M&E Costs',           d:'I-check testing',               u:'Test',         cpu:1500,
-               guide:'E.g. 1 test/month × 5 mills = 60/year. Enter total tests per year.' },
+  equip:     { h:'Equipment Costs',     d:'Microdoser',                    u:'Device',       cpu:200000 },
+  nabl:      { h:'M&E Costs',           d:'NABL testing',                  u:'Test',         cpu:4000,   maeType:'nabl' },
+  icheck:    { h:'M&E Costs',           d:'I-check testing',               u:'Test',         cpu:1500,   maeType:'icheck' },
   ironspot:  { h:'M&E Costs',           d:'Iron spot test kit',            u:'Kit',          cpu:1750,
                guide:'E.g. 5 mills × 1 kit/year = 10. Enter total kits per year.' },
   transport: { h:'Logistics Costs',     d:'Transportation cost',           u:'KG atta',      cpu:1,      attaType:'transport',
@@ -321,6 +318,9 @@ function updateReviewerBadge(status, profile) {
   const labels = { none:'', requested:'Review requested', in_review:'In review', complete:'Review complete ✓' };
   badge.textContent = (profile.full_name || profile.email) + ' — ' + (labels[status] || status);
   badge.className = 'reviewer-badge status-' + status;
+  // Also update costs tab reviewer label
+  const costsLabel = document.getElementById('costs-reviewer-label');
+  if (costsLabel) costsLabel.textContent = profile ? `${profile.full_name || profile.email} assigned` : 'Assign reviewer';
 }
 
 function disableAllInputs() {
@@ -510,6 +510,7 @@ function addCost(d = {}) {
   const isConsulting = d.consulting || headVal === 'Internal Consulting' && (d.consulting !== false);
   const isTravelRow  = d.travelRow;
   const attaType     = d.attaType || d.atta_type || null;
+  const maeType      = d.maeType || null;
 
   if (attaType) tr.dataset.attaType = attaType;
 
@@ -529,7 +530,7 @@ function addCost(d = {}) {
       <input type="text" value="${escHtml(d.d||d.desc||'')}">
       ${guide ? `<div class="cost-guide">${guide}</div>` : ''}
     </td>
-    <td><textarea rows="2" placeholder="Justification for reviewer…" style="font-size:12px;resize:vertical;min-height:34px">${escHtml(justif)}</textarea></td>
+    <td><textarea rows="2" placeholder="Notes for reviewer…" style="font-size:12px;resize:vertical;min-height:34px">${escHtml(justif)}</textarea></td>
     <td><input type="text" value="${escHtml(d.u||d.unit||'')}" placeholder="e.g. KG, trip"></td>
     <td><input type="number" value="${cpu}" placeholder="Monthly cost" style="text-align:right" oninput="updateCostRow(this);calcAll()"></td>
     <td><input type="number" id="u1_${id}" value="${u1}" placeholder="0" ${unitReadonly} oninput="updateCostRow(this);calcAll()"></td>
@@ -544,6 +545,7 @@ function addCost(d = {}) {
 
   if (isConsulting) addHoursHelper(id, d);
   else if (isTravelRow) addTravelHelper(id, d);
+  else if (maeType) addMaeHelper(id, d, maeType);
 
   if (attaType) { setTimeout(() => { updateAttaRows(); updateCostRow(tr.querySelector('input[type=number]')); }, 0); }
   else { updateCostRow(tr.querySelector('input[type=number]')); }
@@ -685,7 +687,7 @@ function calcTravelRow(id) {
 function onHeadChange(sel, id) {
   const head = sel.value;
   // Remove existing helpers
-  ['ch','th'].forEach(p => { const e=document.getElementById(p+id); if(e) e.remove(); });
+  ['ch','th','mh'].forEach(p => { const e=document.getElementById(p+id); if(e) e.remove(); });
   // Add appropriate helper
   if (head === 'Internal Consulting') addHoursHelper(id, {});
   else if (head === 'Travel Costs') addTravelHelper(id, {});
@@ -698,7 +700,7 @@ function onHeadChange(sel, id) {
 }
 
 function deleteRow(id) {
-  ['cr','ch','th'].forEach(p => { const e=document.getElementById(p+id); if(e) e.remove(); });
+  ['cr','ch','th','mh'].forEach(p => { const e=document.getElementById(p+id); if(e) e.remove(); });
   calcAll();
 }
 
@@ -749,6 +751,12 @@ function getCostData() {
       attaType: tr.dataset.attaType || null,
       consulting: !!document.getElementById('hPpl_'+id),
       travelRow:  !!document.getElementById('tPpl_'+id),
+      maeType: document.getElementById('mae_mills_'+id) ? (document.getElementById('mae_freq_'+id) ? 'nabl' : 'icheck') : null,
+      ...(document.getElementById('mae_mills_'+id) && {
+        maeMills:  document.getElementById('mae_mills_'+id)?.value,
+        maeFreq:   document.getElementById('mae_freq_'+id)?.value,
+        maeMonths: document.getElementById('mae_months_'+id)?.value
+      }),
       ...(hPpl!=null && {hPeople:hPpl, hHrs1:hH1, hHrs2:hH2, hHrs3:hH3}),
       ...(tPpl!=null && {tPeople:tPpl, tM1, tM2, tM3}),
     };
@@ -888,10 +896,10 @@ function dlXLSX() {
   if(logSet.size>0)sumRows.push([`CPB excl. ${[...logSet].join('+')}`,cur,d.cpbExclY[0],d.cpbExclY[1]||'',d.cpbExclY[2]||'',d.cpbExclAvg,d.cpbExclAvg]);
   XLSX.utils.book_append_sheet(WB,XLSX.utils.aoa_to_sheet(sumRows),'Summary');
   XLSX.utils.book_append_sheet(WB,XLSX.utils.aoa_to_sheet([['BENEFICIARY CALCULATIONS'],[''],['Year 1',Math.round(d.b1)],['Year 2',Math.round(d.b2)],['Year 3',Math.round(d.b3)],['Total',Math.round(d.totalBen)],['Notes',v('benNotes')]]),'Beneficiary Calculation');
-  const cc=[['COST CALCULATION'],[''],['COST HEAD','DESCRIPTION','JUSTIFICATION','UNIT',`MONTHLY COST/UNIT (${cur})`,'UNITS Y1','UNITS Y2','UNITS Y3','Cost Y1','Cost Y2','Cost Y3']];
+  const cc=[['COST CALCULATION'],[''],['COST HEAD','DESCRIPTION','NOTES','UNIT',`MONTHLY COST/UNIT (${cur})`,'UNITS Y1','UNITS Y2','UNITS Y3','Cost Y1','Cost Y2','Cost Y3']];
   d.rows.forEach(r=>cc.push([r.head,r.desc,r.justif||'',r.unit,r.cpu,r.u1,r.u2,r.u3,r.cy1,r.cy2,r.cy3]));
   XLSX.utils.book_append_sheet(WB,XLSX.utils.aoa_to_sheet(cc),'Cost Calculation');
-  const uc=[['Cost Head','Description','Justification',`Monthly Cost/Unit (${cur})`,'Unit']];
+  const uc=[['Cost Head','Description','Notes',`Monthly Cost/Unit (${cur})`,'Unit']];
   const seen=new Set();d.rows.forEach(r=>{const k=r.head+'|'+r.desc;if(!seen.has(k)){seen.add(k);uc.push([r.head,r.desc,r.justif||'',r.cpu,r.unit]);}});
   XLSX.utils.book_append_sheet(WB,XLSX.utils.aoa_to_sheet(uc),'Unit Costs');
   XLSX.writeFile(WB,`BOTEC_${pn.replace(/\s+/g,'_')}.xlsx`);
@@ -923,9 +931,88 @@ function dlPDF() {
   if(logSet.size>0)tblRows.push([`CPB excl. ${[...logSet].join('+')}`, ...d.cpbExclY.slice(0,NY).map(x=>fmtD(x)),fmtD(d.cpbExclAvg),fmtD(d.cpbExclAvg)]);
   doc.autoTable({startY:55,head:[['Cost head',...yrs,'Avg/year',`${NY}-yr total`]],body:tblRows,styles:{fontSize:8,cellPadding:3},headStyles:{fillColor:[0,151,167],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[245,245,245]},didParseCell:data=>{if(['TOTAL COSTS','Cost per beneficiary'].includes(data.row.raw[0]))data.cell.styles.fontStyle='bold';if(data.row.raw[0].startsWith('Cost per')||data.row.raw[0].startsWith('CPB excl'))data.cell.styles.textColor=[220,96,89];},margin:{left:14,right:14}});
   doc.addPage();doc.setFillColor(0,151,167);doc.rect(0,0,297,18,'F');doc.setTextColor(255,255,255);doc.setFontSize(13);doc.setFont('helvetica','bold');doc.text('Cost Line Items & Justifications',14,12);
-  doc.autoTable({startY:25,head:[['Cost head','Description','Justification','Unit',`Monthly cost/unit`,`Units Y1`,`Cost Y1`,`Units Y2`,`Cost Y2`,`Units Y3`,`Cost Y3`]],body:d.rows.map(r=>[r.head,r.desc,r.justif||'',r.unit,fmtN(r.cpu),r.u1,fmtN(r.cy1),r.u2,fmtN(r.cy2),r.u3,fmtN(r.cy3)]),styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[0,151,167],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[245,245,245]},margin:{left:14,right:14}});
+  doc.autoTable({startY:25,head:[['Cost head','Description','Notes','Unit',`Monthly cost/unit`,`Units Y1`,`Cost Y1`,`Units Y2`,`Cost Y2`,`Units Y3`,`Cost Y3`]],body:d.rows.map(r=>[r.head,r.desc,r.justif||'',r.unit,fmtN(r.cpu),r.u1,fmtN(r.cy1),r.u2,fmtN(r.cy2),r.u3,fmtN(r.cy3)]),styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[0,151,167],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[245,245,245]},margin:{left:14,right:14}});
   const pc=doc.internal.getNumberOfPages();for(let i=1;i<=pc;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150,150,150);doc.setFont('helvetica','normal');doc.text(`${pn} — BOTEC Estimate`,14,205);doc.text(`Page ${i} of ${pc}`,270,205);}
   doc.save(`BOTEC_${pn.replace(/\s+/g,'_')}.pdf`);
+}
+
+
+// M&E helpers — NABL and I-check
+function addMaeHelper(id, d = {}, type = 'nabl') {
+  const existing = document.getElementById('mh'+id);
+  if (existing) existing.remove();
+  const mr = document.createElement('tr');
+  mr.id = 'mh' + id;
+  mr.className = 'helper-row';
+
+  const mills  = d.maeMills  != null ? d.maeMills  : '';
+  const freq   = d.maeFreq   != null ? d.maeFreq   : '';
+  const months = d.maeMonths != null ? d.maeMonths : '';
+
+  if (type === 'nabl') {
+    mr.innerHTML = `<td colspan="12" class="helper-cell">
+      <div class="helper-inner">
+        <div class="helper-toggle" onclick="toggleHelper('maebody_${id}')">
+          <span class="helper-label">NABL testing calculator</span>
+          <span class="helper-chevron" id="maechev_${id}">▾</span>
+        </div>
+        <div id="maebody_${id}">
+          <div class="helper-fixed">NABL testing is performed every 6 months. One mill per district = 5 mills total. Each mill gets 2 tests per year = 10 quality tests per year.</div>
+          <div class="helper-rows">
+            <div class="helper-year-row">
+              <span class="helper-field-lbl" style="min-width:120px">Number of mills</span>
+              <input type="number" id="mae_mills_${id}" value="${mills}" placeholder="e.g. 5" style="width:70px" oninput="calcMaeRow(${id},'nabl')">
+              <span class="hyr-sep">mills ×</span>
+              <input type="number" id="mae_freq_${id}" value="${freq}" placeholder="tests/year e.g. 2" style="width:120px" oninput="calcMaeRow(${id},'nabl')">
+              <span class="hyr-sep">tests/year/mill =</span>
+              <span class="hyr-result" id="mae_result_${id}">— tests/year</span>
+            </div>
+          </div>
+          <div class="helper-hint">Enter the same number for all 3 years, or override units directly above.</div>
+        </div>
+      </div></td>`;
+  } else {
+    // icheck
+    mr.innerHTML = `<td colspan="12" class="helper-cell">
+      <div class="helper-inner">
+        <div class="helper-toggle" onclick="toggleHelper('maebody_${id}')">
+          <span class="helper-label">I-check testing calculator</span>
+          <span class="helper-chevron" id="maechev_${id}">▾</span>
+        </div>
+        <div id="maebody_${id}">
+          <div class="helper-fixed">I-check testing is performed monthly at each mill.</div>
+          <div class="helper-rows">
+            <div class="helper-year-row">
+              <span class="helper-field-lbl" style="min-width:120px">Number of mills</span>
+              <input type="number" id="mae_mills_${id}" value="${mills}" placeholder="e.g. 5" style="width:70px" oninput="calcMaeRow(${id},'icheck')">
+              <span class="hyr-sep">mills ×</span>
+              <input type="number" id="mae_months_${id}" value="${months}" placeholder="months/year e.g. 12" style="width:130px" oninput="calcMaeRow(${id},'icheck')">
+              <span class="hyr-sep">months/year =</span>
+              <span class="hyr-result" id="mae_result_${id}">— tests/year</span>
+            </div>
+          </div>
+          <div class="helper-hint">Units above are filled in automatically. You can still type directly to override.</div>
+        </div>
+      </div></td>`;
+  }
+  document.getElementById('cr'+id).insertAdjacentElement('afterend', mr);
+  if (mills || freq || months) calcMaeRow(id, type);
+}
+
+function calcMaeRow(id, type) {
+  const mills  = parseFloat(document.getElementById('mae_mills_'+id)?.value)  || 0;
+  const freq   = parseFloat(document.getElementById('mae_freq_'+id)?.value)   || 0;
+  const months = parseFloat(document.getElementById('mae_months_'+id)?.value) || 0;
+  const units  = type === 'nabl' ? mills * freq : mills * months;
+  const res = document.getElementById('mae_result_'+id);
+  if (res) res.textContent = units > 0 ? `${units} tests/year` : '— tests/year';
+  ['u1_','u2_','u3_'].forEach(p => {
+    const el = document.getElementById(p+id);
+    if (el) el.value = units || '';
+  });
+  const mainRow = document.getElementById('cr'+id);
+  if (mainRow) updateCostRow(mainRow.querySelector('input[type=number]'));
+  calcAll();
 }
 
 function toggleHelper(bodyId) {
