@@ -236,23 +236,30 @@
 
       <div class="note" style="margin-top:12px">
         <strong>How to fill in cost items:</strong>
-        The <strong>Unit</strong> is what you are counting (e.g. one person-month, one device). <strong>Monthly cost per unit</strong> is what one unit costs per month. <strong>Units per year</strong> are filled automatically for consulting and travel rows using the helpers below each row, and for atta-driven rows from the calculator above. The <strong>Justification</strong> column is for your reviewer.
+        The <strong>Unit</strong> is what you are counting (e.g. one person-month, one device). <strong>Monthly cost per unit</strong> is what one unit costs per month. <strong>Units per year</strong> are filled automatically for consulting and travel rows using the helpers below each row, and for atta-driven rows from the calculator above. The <strong>Notes</strong> column is for you to add any assumptions or context for your reviewer.
+      </div>
+
+      <div class="costs-reviewer-bar">
+        <span style="font-size:13px;color:var(--text2)">Ready for review?</span>
+        <button class="btn-ghost btn-sm" onclick="toggleReviewerPanel()" style="display:flex;align-items:center;gap:6px">
+          👤 <span id="costs-reviewer-label">Assign reviewer</span>
+        </button>
       </div>
 
       <div style="overflow-x:auto">
         <table class="tbl" id="costTbl">
           <thead><tr>
-            <th style="min-width:145px">Cost head</th>
-            <th style="min-width:160px">Description</th>
-            <th style="min-width:170px">Justification <span class="ftag">for reviewer</span></th>
-            <th style="min-width:100px">Unit</th>
-            <th style="width:100px">Monthly cost<br>per unit</th>
-            <th style="width:70px">Units Y1</th>
-            <th style="width:70px">Units Y2</th>
-            <th style="width:70px">Units Y3</th>
-            <th style="width:82px">Cost Y1</th>
-            <th style="width:82px">Cost Y2</th>
-            <th style="width:82px">Cost Y3</th>
+            <th style="min-width:160px">Cost head</th>
+            <th style="min-width:190px">Description</th>
+            <th style="min-width:200px">Notes <span class="ftag">for reviewer</span></th>
+            <th style="min-width:110px">Unit</th>
+            <th style="width:115px">Monthly cost<br>per unit</th>
+            <th style="width:85px">Units Y1</th>
+            <th style="width:85px">Units Y2</th>
+            <th style="width:85px">Units Y3</th>
+            <th style="width:95px">Cost Y1</th>
+            <th style="width:95px">Cost Y2</th>
+            <th style="width:95px">Cost Y3</th>
             <th style="width:28px"></th>
           </tr></thead>
           <tbody id="costBody"></tbody>
