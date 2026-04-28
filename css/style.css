@@ -251,3 +251,10 @@ textarea { resize:vertical;line-height:1.5; }
   .nav-centre{display:none}
   .side-panel{width:100vw}
 }
+
+/* ── Collapsible helpers ──────────────────────────────────────── */
+.helper-toggle { display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom:8px; }
+.helper-toggle:hover .helper-label { color:#006064; }
+.helper-chevron { font-size:13px; color:#0097a7; margin-left:4px; transition:transform .15s; }
+.atta-calc-header { cursor:pointer; }
+.atta-calc-header:hover .atta-calc-title { color:#004d57; }
