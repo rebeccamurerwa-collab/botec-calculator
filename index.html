@@ -132,17 +132,26 @@
     // ── Review assignments ─────────────────────────────────────
     async function loadReviewAssignments() {
       const { data } = await sb.from('botec_documents')
-        .select('id,name,programme,reviewer_status,data,updated_at,profiles:user_id(full_name,email)')
+        .select('id,name,programme,reviewer_status,data,updated_at,user_id')
         .eq('reviewer_id', currentUser.id)
         .neq('reviewer_status', 'none');
       if (!data || !data.length) return;
+
+      // Fetch owner profiles separately
+      const ownerIds = [...new Set(data.map(d => d.user_id).filter(Boolean))];
+      const profileMap = {};
+      if (ownerIds.length) {
+        const { data: profiles } = await sb.from('profiles').select('id,full_name,email').in('id', ownerIds);
+        (profiles||[]).forEach(p => { profileMap[p.id] = p; });
+      }
 
       document.getElementById('review-section').classList.remove('hidden');
       const statusLabel = { requested:'Review requested', in_review:'In review', complete:'Review complete' };
       const statusClass = { requested:'status-requested', in_review:'status-in_review', complete:'status-complete' };
 
       document.getElementById('review-grid').innerHTML = data.map(doc => {
-        const owner = doc.profiles?.full_name || doc.profiles?.email || 'Unknown';
+        const ownerProfile = profileMap[doc.user_id];
+        const owner = ownerProfile?.full_name || ownerProfile?.email || 'Unknown';
         const updated = new Date(doc.updated_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
         return `<div class="doc-card" onclick="window.location.href='calculator.html?id=${doc.id}'">
           <div class="doc-card-header">
@@ -166,7 +175,7 @@
     // ── My documents ───────────────────────────────────────────
     async function loadDocuments() {
       const { data, error } = await sb.from('botec_documents')
-        .select('id,name,programme,created_at,updated_at,data,reviewer_status,profiles:reviewer_id(full_name,email)')
+        .select('id,name,programme,created_at,updated_at,data,reviewer_status,reviewer_id')
         .eq('user_id', currentUser.id)
         .order('updated_at', { ascending:false });
 
@@ -174,15 +183,24 @@
       if (error) { alert('Failed to load documents: ' + error.message); return; }
       if (!data || !data.length) { document.getElementById('docs-empty').classList.remove('hidden'); return; }
 
+      // Fetch reviewer profiles separately
+      const reviewerIds = [...new Set(data.map(d => d.reviewer_id).filter(Boolean))];
+      const profileMap = {};
+      if (reviewerIds.length) {
+        const { data: profiles } = await sb.from('profiles').select('id,full_name,email').in('id', reviewerIds);
+        (profiles||[]).forEach(p => { profileMap[p.id] = p; });
+      }
+
       document.getElementById('docs-grid').classList.remove('hidden');
       const statusLabel = { none:'', requested:'Review requested', in_review:'In review', complete:'Review complete ✓' };
       const statusClass = { requested:'status-requested', in_review:'status-in_review', complete:'status-complete' };
 
       document.getElementById('docs-grid').innerHTML = data.map(doc => {
-        const cpb     = doc.data?.cpbAvg != null ? `₹${parseFloat(doc.data.cpbAvg).toFixed(2)}` : '—';
-        const totalBen= doc.data?.totalBen != null ? parseInt(doc.data.totalBen).toLocaleString() : '—';
-        const updated = new Date(doc.updated_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-        const reviewer= doc.profiles ? (doc.profiles.full_name || doc.profiles.email) : null;
+        const cpb      = doc.data?.cpbAvg != null ? `₹${parseFloat(doc.data.cpbAvg).toFixed(2)}` : '—';
+        const totalBen = doc.data?.totalBen != null ? parseInt(doc.data.totalBen).toLocaleString() : '—';
+        const updated  = new Date(doc.updated_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+        const rProfile = doc.reviewer_id ? profileMap[doc.reviewer_id] : null;
+        const reviewer = rProfile ? (rProfile.full_name || rProfile.email) : null;
         return `<div class="doc-card" onclick="openDocument('${doc.id}')">
           <div class="doc-card-header">
             <div class="doc-icon">B</div>
