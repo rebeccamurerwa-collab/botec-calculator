@@ -283,7 +283,7 @@ async function saveDocument() {
 
 async function loadDocument(id) {
   const { data, error } = await sb.from('botec_documents')
-    .select('*, profiles:reviewer_id(full_name,email)').eq('id', id).single();
+    .select('*').eq('id', id).single();
   if (error) { alert('Could not load document: ' + error.message); return; }
 
   // Determine if current user is the reviewer
@@ -304,8 +304,11 @@ async function loadDocument(id) {
       await sb.from('botec_documents').update({ reviewer_status: 'in_review' }).eq('id', id);
     }
   } else {
-    // Update reviewer badge for owner
-    updateReviewerBadge(data.reviewer_status, data.profiles);
+    // Fetch reviewer profile separately and update badge
+    if (data.reviewer_id) {
+      const { data: rProfile } = await sb.from('profiles').select('full_name,email').eq('id', data.reviewer_id).single();
+      updateReviewerBadge(data.reviewer_status, rProfile);
+    }
   }
   setSaveStatus('');
 }
