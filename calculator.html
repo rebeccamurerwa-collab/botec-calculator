@@ -190,10 +190,12 @@
 
       <!-- Atta consumption calculator -->
       <div class="atta-calc-box">
-        <div class="atta-calc-header">
+        <div class="atta-calc-header" onclick="toggleHelper('atta-body')" style="cursor:pointer">
           <span class="atta-calc-title">Atta consumption calculator</span>
           <span class="ftag">auto-fills Premix, Transport, Grinding &amp; Packaging rows below</span>
+          <span id="atta-chev" style="margin-left:auto;font-size:13px;color:#0097a7">▾</span>
         </div>
+        <div id="atta-body">
         <div class="atta-assumptions">
           Fixed assumptions (MDM guidelines): <strong>125g atta per student per day</strong> · <strong>16 serving days/month</strong> (atta 4 days/week; rice the remaining 2 days) · <strong>Premix : flour ratio = 1 : 5</strong>
         </div>
@@ -229,6 +231,7 @@
           <div class="atta-val teal" id="atta-premix-3">—</div>
         </div>
         <div class="atta-note">Beneficiary numbers are linked automatically from the Beneficiaries tab. ↑ These figures update instantly when beneficiaries change.</div>
+        </div>
       </div>
 
       <div class="note" style="margin-top:12px">
