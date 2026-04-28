@@ -563,7 +563,11 @@ function addHoursHelper(id, d = {}) {
   const h3 = d.hHrs3 != null ? d.hHrs3 : '';
   hr.innerHTML = `<td colspan="12" class="helper-cell">
     <div class="helper-inner">
-      <span class="helper-label">Hours calculator</span>
+      <div class="helper-toggle" onclick="toggleHelper('hbody_${id}')">
+        <span class="helper-label">Hours calculator</span>
+        <span class="helper-chevron" id="hchev_${id}">▾</span>
+      </div>
+      <div id="hbody_${id}">
       <div class="helper-fixed">Fixed: 160 standard hrs/month &nbsp;·&nbsp; 12 months/year</div>
       <div class="helper-rows">
         <div class="helper-person-row">
@@ -591,6 +595,8 @@ function addHoursHelper(id, d = {}) {
         </div>
       </div>
       <div class="helper-hint">Units above are filled in automatically. You can still type directly to override.</div>
+      </div>
+      </div>
     </div></td>`;
   document.getElementById('cr'+id).insertAdjacentElement('afterend', hr);
   if (h1 || h2 || h3) calcHoursRow(id);
@@ -624,7 +630,11 @@ function addTravelHelper(id, d = {}) {
   const m3 = d.tM3 != null ? d.tM3 : '';
   tr2.innerHTML = `<td colspan="12" class="helper-cell">
     <div class="helper-inner">
-      <span class="helper-label">Travel calculator</span>
+      <div class="helper-toggle" onclick="toggleHelper('tbody_${id}')">
+        <span class="helper-label">Travel calculator</span>
+        <span class="helper-chevron" id="tchev_${id}">▾</span>
+      </div>
+      <div id="tbody_${id}">
       <div class="helper-rows">
         <div class="helper-person-row">
           <span class="helper-field-lbl">Number of people travelling</span>
@@ -651,6 +661,7 @@ function addTravelHelper(id, d = {}) {
         </div>
       </div>
       <div class="helper-hint">Units above are filled in automatically. You can still type directly to override.</div>
+      </div>
     </div></td>`;
   document.getElementById('cr'+id).insertAdjacentElement('afterend', tr2);
   if (m1 || m2 || m3) calcTravelRow(id);
@@ -915,6 +926,17 @@ function dlPDF() {
   doc.autoTable({startY:25,head:[['Cost head','Description','Justification','Unit',`Monthly cost/unit`,`Units Y1`,`Cost Y1`,`Units Y2`,`Cost Y2`,`Units Y3`,`Cost Y3`]],body:d.rows.map(r=>[r.head,r.desc,r.justif||'',r.unit,fmtN(r.cpu),r.u1,fmtN(r.cy1),r.u2,fmtN(r.cy2),r.u3,fmtN(r.cy3)]),styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[0,151,167],textColor:255,fontStyle:'bold'},alternateRowStyles:{fillColor:[245,245,245]},margin:{left:14,right:14}});
   const pc=doc.internal.getNumberOfPages();for(let i=1;i<=pc;i++){doc.setPage(i);doc.setFontSize(7);doc.setTextColor(150,150,150);doc.setFont('helvetica','normal');doc.text(`${pn} — BOTEC Estimate`,14,205);doc.text(`Page ${i} of ${pc}`,270,205);}
   doc.save(`BOTEC_${pn.replace(/\s+/g,'_')}.pdf`);
+}
+
+function toggleHelper(bodyId) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? '' : 'none';
+  // Update chevron
+  const chevId = bodyId.replace('body_', 'chev_').replace('hbody_', 'hchev_').replace('tbody_', 'tchev_');
+  const chev = document.getElementById(chevId);
+  if (chev) chev.textContent = isHidden ? '▾' : '▸';
 }
 
 document.addEventListener('input', () => { if(!isReviewer) setSaveStatus('Unsaved'); });
