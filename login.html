@@ -9,33 +9,33 @@
 <body class="auth-page">
   <div class="auth-container">
     <div class="auth-brand">
-      <div class="brand-mark">B</div>
+      <div class="brand-mark" style="background:#ffd8cb;color:#0f1f3d">B</div>
       <h1>BOTEC Calculator</h1>
       <p>Back-of-the-envelope cost-per-beneficiary estimates</p>
     </div>
 
     <div class="auth-card">
       <div class="auth-tabs">
-        <button class="auth-tab active" onclick="switchAuthTab('login')">Sign in</button>
-        <button class="auth-tab" onclick="switchAuthTab('signup')">Create account</button>
+        <button class="auth-tab active" onclick="switchTab('login')">Sign in</button>
+        <button class="auth-tab" onclick="switchTab('signup')">Create account</button>
       </div>
 
-      <!-- Login -->
+      <!-- Sign in -->
       <div id="login-form">
         <div class="field">
           <label>Email</label>
-          <input type="email" id="login-email" placeholder="you@organisation.org" autocomplete="email">
+          <input type="email" id="login-email" placeholder="you@fortifyhealth.global" autocomplete="email">
         </div>
         <div class="field">
           <label>Password</label>
           <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
         </div>
         <div id="login-error" class="form-error hidden"></div>
-        <button class="btn-primary full-width" onclick="handleLogin()">Sign in</button>
+        <button class="btn-primary full-width" id="login-btn" onclick="handleLogin()">Sign in</button>
         <button class="btn-link" onclick="handleForgotPassword()">Forgot password?</button>
       </div>
 
-      <!-- Signup -->
+      <!-- Create account -->
       <div id="signup-form" class="hidden">
         <div class="field">
           <label>Full name</label>
@@ -43,7 +43,8 @@
         </div>
         <div class="field">
           <label>Email</label>
-          <input type="email" id="signup-email" placeholder="you@organisation.org" autocomplete="email">
+          <input type="email" id="signup-email" placeholder="you@fortifyhealth.global" autocomplete="email">
+          <span style="font-size:11px;color:var(--text3);margin-top:4px;display:block">Must be a @fortifyhealth.global email address</span>
         </div>
         <div class="field">
           <label>Password</label>
@@ -51,7 +52,7 @@
         </div>
         <div id="signup-error" class="form-error hidden"></div>
         <div id="signup-success" class="form-success hidden"></div>
-        <button class="btn-primary full-width" onclick="handleSignup()">Create account</button>
+        <button class="btn-primary full-width" id="signup-btn" onclick="handleSignup()">Create account</button>
       </div>
     </div>
   </div>
@@ -59,12 +60,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-client.js"></script>
   <script>
+    const ALLOWED_DOMAIN = 'fortifyhealth.global';
+
     // If already logged in, go to dashboard
     sb.auth.getSession().then(({ data: { session } }) => {
       if (session) window.location.href = 'index.html';
     });
 
-    function switchAuthTab(tab) {
+    function switchTab(tab) {
       document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
       event.target.classList.add('active');
       document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
@@ -72,15 +75,16 @@
     }
 
     async function handleLogin() {
-      const email = document.getElementById('login-email').value.trim();
+      const email    = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-password').value;
-      const errEl = document.getElementById('login-error');
+      const errEl    = document.getElementById('login-error');
+      const btn      = document.getElementById('login-btn');
       errEl.classList.add('hidden');
-      const btn = event.target;
       btn.textContent = 'Signing in…'; btn.disabled = true;
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) {
-        errEl.textContent = error.message; errEl.classList.remove('hidden');
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
         btn.textContent = 'Sign in'; btn.disabled = false;
       } else {
         window.location.href = 'index.html';
@@ -88,17 +92,36 @@
     }
 
     async function handleSignup() {
-      const name = document.getElementById('signup-name').value.trim();
-      const email = document.getElementById('signup-email').value.trim();
+      const name     = document.getElementById('signup-name').value.trim();
+      const email    = document.getElementById('signup-email').value.trim();
       const password = document.getElementById('signup-password').value;
-      const errEl = document.getElementById('signup-error');
-      const okEl = document.getElementById('signup-success');
-      errEl.classList.add('hidden'); okEl.classList.add('hidden');
-      const btn = event.target;
+      const errEl    = document.getElementById('signup-error');
+      const okEl     = document.getElementById('signup-success');
+      const btn      = document.getElementById('signup-btn');
+      errEl.classList.add('hidden');
+      okEl.classList.add('hidden');
+
+      // Domain check — must be @fortifyhealth.global
+      if (!email.toLowerCase().endsWith('@' + ALLOWED_DOMAIN)) {
+        errEl.textContent = `Only @${ALLOWED_DOMAIN} email addresses can create an account.`;
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      if (password.length < 8) {
+        errEl.textContent = 'Password must be at least 8 characters.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
       btn.textContent = 'Creating…'; btn.disabled = true;
-      const { error } = await sb.auth.signUp({ email, password, options: { data: { full_name: name } } });
+      const { error } = await sb.auth.signUp({
+        email, password,
+        options: { data: { full_name: name } }
+      });
       if (error) {
-        errEl.textContent = error.message; errEl.classList.remove('hidden');
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
         btn.textContent = 'Create account'; btn.disabled = false;
       } else {
         okEl.textContent = 'Account created! Check your email to confirm, then sign in.';
@@ -110,17 +133,18 @@
     async function handleForgotPassword() {
       const email = document.getElementById('login-email').value.trim();
       if (!email) { alert('Enter your email address first.'); return; }
-      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/login.html' });
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/login.html'
+      });
       if (error) alert('Error: ' + error.message);
       else alert('Password reset email sent. Check your inbox.');
     }
 
     // Enter key support
     document.addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        if (!document.getElementById('signup-form').classList.contains('hidden')) handleSignup();
-        else handleLogin();
-      }
+      if (e.key !== 'Enter') return;
+      if (!document.getElementById('signup-form').classList.contains('hidden')) handleSignup();
+      else handleLogin();
     });
   </script>
 </body>
