@@ -275,13 +275,6 @@
         The <strong>Unit</strong> is what you are counting (e.g. one person-month, one device). <strong>Monthly cost per unit</strong> is what one unit costs per month. <strong>Units per year</strong> are filled automatically for consulting and travel rows using the helpers below each row, and for atta-driven rows from the calculator above. The <strong>Notes</strong> column is for you to add any assumptions or context for your reviewer.
       </div>
 
-      <div class="costs-reviewer-bar">
-        <span style="font-size:13px;color:var(--text2)">Ready for review?</span>
-        <button class="btn-ghost btn-sm" onclick="toggleReviewerPanel()" style="display:flex;align-items:center;gap:6px">
-          👤 <span id="costs-reviewer-label">Assign reviewer</span>
-        </button>
-      </div>
-
       <div style="overflow-x:auto">
         <table class="tbl" id="costTbl">
           <thead><tr>
@@ -320,6 +313,13 @@
         <button class="addbtn" onclick="preset('grinding')">+ Grinding</button>
         <button class="addbtn" onclick="preset('packaging')">+ Packaging</button>
         <button class="addbtn" onclick="preset('event')">+ Event / Admin</button>
+      </div>
+
+      <div class="costs-reviewer-bar" style="margin-top:1.25rem">
+        <span style="font-size:13px;color:var(--text2)">Ready for review?</span>
+        <button class="btn-ghost btn-sm" onclick="toggleReviewerPanel()" style="display:flex;align-items:center;gap:6px">
+          👤 <span id="costs-reviewer-label">Assign reviewer</span>
+        </button>
       </div>
     </div>
 
