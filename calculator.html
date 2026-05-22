@@ -6,6 +6,16 @@
 <title>BOTEC Calculator</title>
 <link rel="stylesheet" href="css/style.css">
 <style>
+  /* Checklist styles */
+  .checklist-group { margin-bottom:1.5rem; }
+  .checklist-section-title { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text3);margin-bottom:8px; }
+  .checklist-item { display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border);cursor:pointer;font-size:13px; }
+  .checklist-item:last-child { border-bottom:none; }
+  .checklist-item input[type=checkbox] { width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:#0097a7; }
+  .checklist-item div { display:flex;flex-direction:column;gap:2px; }
+  .checklist-item strong { font-size:13px;font-weight:500;color:var(--text1); }
+  .checklist-item span { font-size:12px;color:var(--text3); }
+
   /* Pin delete column to right edge so it's always visible without scrolling */
   #costTbl th:last-child,
   #costTbl td.del-cell {
@@ -107,14 +117,54 @@
 <main class="calc-main">
   <div class="calc-card">
     <div class="tabs">
-      <button class="tab on" onclick="go('setup')">1. Project</button>
+      <button class="tab on" onclick="go('checklist')">0. Checklist</button>
+      <button class="tab" onclick="go('setup')">1. Project</button>
       <button class="tab" onclick="go('ben')">2. Beneficiaries</button>
       <button class="tab" onclick="go('costs')">3. Cost items</button>
       <button class="tab" onclick="go('results')">4. Results &amp; export</button>
     </div>
 
+    <!-- ===== CHECKLIST ===== -->
+    <div id="p-checklist" class="pane on">
+      <div class="stitle">Before you start — data checklist</div>
+      <div class="note" style="margin-bottom:1.25rem">Work through this list and tick each item once you have the information to hand. This helps you avoid stopping halfway through to look things up.</div>
+
+      <div class="checklist-group">
+        <div class="checklist-section-title">Project basics</div>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Project name and programme description</strong><span>A short title and 1–2 sentence description of what this BOTEC covers.</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Prepared by name and date</strong><span>Your name and today's date.</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Reviewer name</strong><span>Who will review and sign off on this BOTEC?</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Programme / state</strong><span>Which state or region does this cover?</span></div></label>
+      </div>
+
+      <div class="checklist-group">
+        <div class="checklist-section-title">Beneficiaries</div>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Number of districts / locations</strong><span>How many districts, blocks, or geographic units will be covered?</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Number of schools / kitchens / mills per unit</strong><span>The secondary unit (e.g. schools per district, kitchens per block).</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Number of beneficiaries per unit</strong><span>Students per school, or PDS beneficiaries per block etc.</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Annual growth rate (if applicable)</strong><span>Expected % increase in beneficiaries year on year. Leave at 0 if constant.</span></div></label>
+      </div>
+
+      <div class="checklist-group">
+        <div class="checklist-section-title">Costs</div>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Staff roles, monthly salaries, and time allocation</strong><span>Monthly salary for each role and what % of their time is dedicated to this programme per year.</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Travel frequency and cost per trip</strong><span>Number of trips per year per role and average cost per trip (INR).</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Atta / wheat flour consumption figures</strong><span>Grams per person per day and serving days per month. Used to auto-calculate premix quantity.</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Premix cost per kg (NaFeEDTA)</strong><span>Current market rate. Standard assumption: ₹400/kg.</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Equipment requirements</strong><span>Number of microdosers or other equipment needed and cost per unit.</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>M&amp;E testing plan</strong><span>Number of NABL tests, i-check calibrations, and Iron Spot Test kits per year. Punjab standard: 10 IST kits/year across 5 mills (1 mill per district, tested daily).</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Logistics costs (if applicable)</strong><span>Transportation and grinding rates per kg of atta. Only relevant for PDS-type programmes.</span></div></label>
+        <label class="checklist-item"><input type="checkbox"> <div><strong>Event / admin costs (if applicable)</strong><span>Number and cost of awareness sessions, launch events, or training programmes.</span></div></label>
+      </div>
+
+      <div id="checklist-progress" style="margin-top:1.25rem;padding:12px 16px;background:var(--surface2);border-radius:var(--radius);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:13px;color:var(--text2)" id="checklist-count">0 of 16 items checked</span>
+        <button class="btn-primary btn-sm" onclick="go('setup')">Start filling in the tool →</button>
+      </div>
+    </div>
+
     <!-- ===== SETUP ===== -->
-    <div id="p-setup" class="pane on">
+    <div id="p-setup" class="pane">
       <div class="stitle">Project information</div>
       <div class="frow f2">
         <div class="field"><label>Project name</label><input type="text" id="projName"></div>
