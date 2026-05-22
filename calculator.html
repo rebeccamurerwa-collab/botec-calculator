@@ -122,9 +122,43 @@
       </div>
       <div class="frow f4">
         <div class="field"><label>Prepared by</label><input type="text" id="prepBy"></div>
-        <div class="field"><label>Preparation date</label><input type="text" id="prepDate"></div>
+        <div class="field">
+          <label>Preparation date</label>
+          <div style="display:flex;gap:6px">
+            <select id="prepDay" style="width:70px" onchange="syncDateField('prep')">
+              <option value="">Day</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option><option>27</option><option>28</option><option>29</option><option>30</option><option>31</option>
+            </select>
+            <select id="prepMonth" style="flex:1" onchange="syncDateField('prep')">
+              <option value="">Month</option>
+              <option>January</option><option>February</option><option>March</option>
+              <option>April</option><option>May</option><option>June</option>
+              <option>July</option><option>August</option><option>September</option>
+              <option>October</option><option>November</option><option>December</option>
+            </select>
+            <select id="prepYear" style="width:88px" onchange="syncDateField('prep')"></select>
+          </div>
+          <input type="hidden" id="prepDate">
+        </div>
         <div class="field"><label>Reviewed by</label><input type="text" id="reviewBy"></div>
-        <div class="field"><label>Review date</label><input type="text" id="reviewDate"></div>
+        <div class="field">
+          <label>Review date</label>
+          <div style="display:flex;gap:6px">
+            <select id="reviewDay" style="width:70px" onchange="syncDateField('review')">
+              <option value="">Day</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option><option>27</option><option>28</option><option>29</option><option>30</option><option>31</option>
+            </select>
+            <select id="reviewMonth" style="flex:1" onchange="syncDateField('review')">
+              <option value="">Month</option>
+              <option>January</option><option>February</option><option>March</option>
+              <option>April</option><option>May</option><option>June</option>
+              <option>July</option><option>August</option><option>September</option>
+              <option>October</option><option>November</option><option>December</option>
+            </select>
+            <select id="reviewYear" style="width:88px" onchange="syncDateField('review')"></select>
+          </div>
+          <input type="hidden" id="reviewDate">
+        </div>
       </div>
       <div class="frow f2">
         <div class="field"><label>Currency</label>
@@ -323,7 +357,62 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <!-- CHANGE: jsPDF scripts removed as PDF export is no longer needed -->
 <script src="js/supabase-client.js"></script>
+<script>
+// ── Date dropdowns ────────────────────────────────────────────
+(function populateYearDropdowns() {
+  const now = new Date().getFullYear();
+  ["prepYear","reviewYear"].forEach(id => {
+    const sel = document.getElementById(id);
+    for (let y = now - 3; y <= now + 3; y++) {
+      const o = document.createElement("option");
+      o.value = o.textContent = y;
+      if (y === now) o.selected = true;
+      sel.appendChild(o);
+    }
+  });
+})();
+
+function syncDateField(prefix) {
+  const day   = document.getElementById(prefix + "Day").value;
+  const month = document.getElementById(prefix + "Month").value;
+  const year  = document.getElementById(prefix + "Year").value;
+  const hidden = document.getElementById(prefix + "Date");
+  if (hidden) hidden.value = (day && month && year) ? day + " " + month + " " + year : "";
+}
+
+function restoreDateDropdowns(s) {
+  if (!s) return;
+  [["prep","prepDate"],["review","reviewDate"]].forEach(([prefix, key]) => {
+    const val = s[key] || "";
+    if (!val) return;
+    const parts = val.split(" ");
+    // Support both old format "Month Year" and new "Day Month Year"
+    if (parts.length === 3) {
+      const daySel   = document.getElementById(prefix + "Day");
+      const monthSel = document.getElementById(prefix + "Month");
+      const yearSel  = document.getElementById(prefix + "Year");
+      if (daySel)   daySel.value   = parts[0];
+      if (monthSel) monthSel.value = parts[1];
+      if (yearSel)  yearSel.value  = parts[2];
+    } else if (parts.length === 2) {
+      // Legacy: Month Year — leave day blank
+      const monthSel = document.getElementById(prefix + "Month");
+      const yearSel  = document.getElementById(prefix + "Year");
+      if (monthSel) monthSel.value = parts[0];
+      if (yearSel)  yearSel.value  = parts[1];
+    }
+  });
+}
+</script>
 <script src="js/calculator.js"></script>
+<script>
+// Patch deserialiseState to also restore date dropdowns after calculator.js loads
+const _origDeserialise = window.deserialiseState;
+window.deserialiseState = function(s) {
+  _origDeserialise(s);
+  restoreDateDropdowns(s);
+};
+</script>
 
 </body>
 </html>
