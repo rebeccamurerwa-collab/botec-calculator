@@ -22,7 +22,7 @@ const PRESETS = {
   nabl:      { h:'M&E Costs',           d:'NABL testing',                  u:'Test',         cpu:4000,   maeType:'nabl' },
   icheck:    { h:'M&E Costs',           d:'I-check testing',               u:'Test',         cpu:1500,   maeType:'icheck' },
   ironspot:  { h:'M&E Costs',           d:'Iron spot test kit',            u:'Kit',          cpu:1750,
-               guide:'Standard: 2 IST kits per year per site (tested twice yearly). E.g. 1 mill × 2 kits/year = 2.' },
+               guide:'Iron Spot Test (1L per kit, 10ml/day). 1 mill per district × 5 districts = 5 mills. 10 IST kits per year across 5 mills (tested daily). Enter total kits per year.' },
   transport: { h:'Logistics Costs',     d:'Transportation cost',           u:'KG atta',      cpu:1,      attaType:'transport',
                guide:'Auto-calculated from atta consumption (yearly KG). ₹1.00 per KG of wheat flour transported.' },
   grinding:  { h:'Logistics Costs',     d:'Grinding cost',                 u:'KG wheat',     cpu:3,      attaType:'grinding',
@@ -384,12 +384,27 @@ function toggleLog(h, val) { val ? logSet.add(h) : logSet.delete(h); renderLogFl
 
 // ── Tabs ──────────────────────────────────────────────────────
 function go(id) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('on', ['setup','ben','costs','results'][i] === id));
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('on', ['checklist','setup','ben','costs','results'][i] === id));
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('on'));
   document.getElementById('p-' + id).classList.add('on');
-  if (id === 'results') { calcAll(); renderResults(); }
-  if (id === 'costs')   { calcAtta(); }
+  if (id === 'results')   { calcAll(); renderResults(); }
+  if (id === 'costs')     { calcAtta(); }
+  if (id === 'checklist') { updateChecklistCount(); }
 }
+
+function updateChecklistCount() {
+  const boxes = document.querySelectorAll('#p-checklist input[type=checkbox]');
+  const checked = [...boxes].filter(b => b.checked).length;
+  const el = document.getElementById('checklist-count');
+  if (el) el.textContent = `${checked} of ${boxes.length} items checked`;
+}
+
+// Attach checklist counter to all checkboxes after DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#p-checklist input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', updateChecklistCount);
+  });
+});
 
 // ── Beneficiaries ─────────────────────────────────────────────
 function setBenMode(mode, silent) {
@@ -854,28 +869,27 @@ function dlXLSX() {
 
   function hdrCell(val) {
     return { v:val, t:'s', s:{
-      font:{name:'Calibri',sz:11,bold:true,color:{rgb:'FFFFFF'}},
+      font:{name:'Calibri',sz:10,bold:true,color:{rgb:'FFFFFF'}},
       fill:{fgColor:{rgb:'006064'}},
-      alignment:{horizontal:'center',vertical:'center',wrapText:true},
-      border:{bottom:{style:'thin',color:{rgb:'004D40'}}}
+      alignment:{horizontal:'center',vertical:'center',wrapText:true}
     }};
   }
   function titleCell(val) {
     return { v:val, t:'s', s:{
-      font:{name:'Calibri',sz:14,bold:true,color:{rgb:'006064'}},
+      font:{name:'Calibri',sz:10,bold:true,color:{rgb:'006064'}},
       alignment:{vertical:'center'}
     }};
   }
   function subHdrCell(val) {
     return { v:val, t:'s', s:{
-      font:{name:'Calibri',sz:11,bold:true,color:{rgb:'004D40'}},
+      font:{name:'Calibri',sz:10,bold:true,color:{rgb:'004D40'}},
       fill:{fgColor:{rgb:'E0F7FA'}},
       alignment:{vertical:'center',wrapText:true}
     }};
   }
   function totalCell(val, isNum) {
-    return { v:val, t:isNum?'n':'s', s:{
-      font:{name:'Calibri',sz:11,bold:true,color:{rgb:'212121'}},
+    return { v:val||(isNum?0:''), t:isNum?'n':'s', s:{
+      font:{name:'Calibri',sz:10,bold:true},
       fill:{fgColor:{rgb:'B2EBF2'}},
       numFmt: isNum ? `"${s}"#,##0` : undefined,
       alignment:{horizontal:isNum?'right':'left',vertical:'top'}
@@ -883,7 +897,7 @@ function dlXLSX() {
   }
   function cpbCell(val) {
     return { v:typeof val==='number'?val:0, t:'n', s:{
-      font:{name:'Calibri',sz:11,bold:true,color:{rgb:'B71C1C'}},
+      font:{name:'Calibri',sz:10,bold:true,color:{rgb:'B71C1C'}},
       fill:{fgColor:{rgb:'FFEBEE'}},
       numFmt:`"${s}"0.00`,
       alignment:{horizontal:'right',vertical:'top'}
@@ -891,14 +905,14 @@ function dlXLSX() {
   }
   function numCell(val) {
     return { v:val||0, t:'n', s:{
-      font:{name:'Calibri',sz:11},
+      font:{name:'Calibri',sz:10},
       numFmt:`"${s}"#,##0`,
       alignment:{horizontal:'right',vertical:'top'}
     }};
   }
   function txtCell(val, bold) {
     return { v:val||'', t:'s', s:{
-      font:{name:'Calibri',sz:11,bold:!!bold},
+      font:{name:'Calibri',sz:10,bold:!!bold},
       alignment:{vertical:'top',wrapText:true}
     }};
   }
@@ -911,7 +925,7 @@ function dlXLSX() {
   function altCell(val, isNum, rowIdx) {
     const bg = rowIdx%2===0 ? 'F5F5F5' : 'FFFFFF';
     return { v:val||(isNum?0:''), t:isNum?'n':'s', s:{
-      font:{name:'Calibri',sz:11},
+      font:{name:'Calibri',sz:10},
       fill:{fgColor:{rgb:bg}},
       numFmt: isNum ? `"${s}"#,##0` : undefined,
       alignment:{horizontal:isNum?'right':'left',vertical:'top',wrapText:true}
@@ -927,32 +941,86 @@ function dlXLSX() {
   const sumData = [];
   sumData.push([titleCell('COST PER BENEFICIARY ESTIMATE')]);
   sumData.push([]);
-  sumData.push([subHdrCell('Project:'),        txtCell(pn, true)]);
-  sumData.push([subHdrCell('Prepared by:'),    txtCell(v('prepBy'))]);
-  sumData.push([subHdrCell('Preparation date:'), txtCell(v('prepDate'))]);
-  sumData.push([subHdrCell('Reviewed by:'),    txtCell(v('reviewBy'))]);
-  sumData.push([subHdrCell('Review date:'),    txtCell(v('reviewDate'))]);
+  sumData.push([subHdrCell('Project:'),           txtCell(pn, true)]);
+  sumData.push([subHdrCell('Prepared by:'),       txtCell(v('prepBy'))]);
+  sumData.push([subHdrCell('Preparation date:'),  txtCell(v('prepDate'))]);
+  sumData.push([subHdrCell('Reviewed by:'),       txtCell(v('reviewBy'))]);
+  sumData.push([subHdrCell('Review date:'),       txtCell(v('reviewDate'))]);
   sumData.push([subHdrCell('Programme / state:'), txtCell(v('programme'))]);
   sumData.push([]);
-  sumData.push(['','', hdrCell('Year 1'), hdrCell('Year 2'), hdrCell('Year 3'), hdrCell('Average / yr'), hdrCell('3-yr Total')]);
-  sumData.push([subHdrCell('Beneficiaries'), '', numCell(Math.round(d.b1)), numCell(Math.round(d.b2)), numCell(Math.round(d.b3)), numCell(Math.round(d.totalBen/NY)), numCell(Math.round(d.totalBen))]);
-  sumData.push([]);
-  sumData.push([subHdrCell(`Costs (${cur})`)]);
 
+  // Column header row — bold teal
+  sumData.push([hdrCell(''), hdrCell('Cost head'), ...yrs.map(y=>hdrCell(y)), hdrCell('Average / yr'), hdrCell(`${NY}-yr Total`)]);
+
+  // Beneficiaries row
+  sumData.push([
+    subHdrCell('Beneficiaries'), txtCell(''),
+    numCell(Math.round(d.b1)),
+    NY>=2 ? numCell(Math.round(d.b2)) : txtCell(''),
+    NY>=3 ? numCell(Math.round(d.b3)) : txtCell(''),
+    numCell(Math.round(d.totalBen/NY)),
+    numCell(Math.round(d.totalBen))
+  ]);
+  sumData.push([]);
+  sumData.push([subHdrCell(`Costs (${cur})`), txtCell('')]);
+
+  // Cost head rows
   let rIdx = 0;
   ah.forEach(h => {
-    const vv=d.byHead[h], t=vv.y1+vv.y2+vv.y3;
-    sumData.push(['', altCell(h,false,rIdx), altCell(vv.y1,true,rIdx), altCell(vv.y2,true,rIdx), altCell(vv.y3,true,rIdx), altCell(t/NY,true,rIdx), altCell(t,true,rIdx)]);
+    const vv=d.byHead[h], vals=[vv.y1,vv.y2,vv.y3].slice(0,NY), t=vals.reduce((a,b)=>a+b,0);
+    const padded = [...vals];
+    while(padded.length < 3) padded.push(0);
+    sumData.push([altCell('',false,rIdx), altCell(h,false,rIdx), altCell(padded[0],true,rIdx), altCell(padded[1],true,rIdx), altCell(padded[2],true,rIdx), altCell(t/NY,true,rIdx), altCell(t,true,rIdx)]);
     rIdx++;
   });
+
+  // Managerial multiplier
   const mt=d.mgrVal.y1+d.mgrVal.y2+d.mgrVal.y3;
-  if(mt>0) sumData.push(['', txtCell(`${(d.mgr*100).toFixed(0)}% managerial multiplier`), numCell(d.mgrVal.y1), numCell(d.mgrVal.y2), numCell(d.mgrVal.y3), numCell(mt/NY), numCell(mt)]);
+  if(mt>0) {
+    sumData.push([txtCell(''), txtCell(`${(d.mgr*100).toFixed(0)}% managerial multiplier`,true),
+      numCell(d.mgrVal.y1), numCell(d.mgrVal.y2||0), numCell(d.mgrVal.y3||0),
+      numCell(mt/NY), numCell(mt)]);
+  }
+
+  // Buffer
   const bt=d.bufVal.y1+d.bufVal.y2+d.bufVal.y3;
-  if(bt>0) sumData.push(['', txtCell(`${(d.buf*100).toFixed(0)}% buffer / contingency`), numCell(d.bufVal.y1), numCell(d.bufVal.y2), numCell(d.bufVal.y3), numCell(bt/NY), numCell(bt)]);
+  if(bt>0) {
+    sumData.push([txtCell(''), txtCell(`${(d.buf*100).toFixed(0)}% buffer / contingency`,true),
+      numCell(d.bufVal.y1), numCell(d.bufVal.y2||0), numCell(d.bufVal.y3||0),
+      numCell(bt/NY), numCell(bt)]);
+  }
+
   sumData.push([]);
-  sumData.push([totalCell('Total costs',false), '', totalCell(d.totY.y1,true), totalCell(d.totY.y2,true), totalCell(d.totY.y3,true), totalCell(d.avgCost,true), totalCell(d.totalAll,true)]);
-  sumData.push([cpbCell('Cost per beneficiary'), '', cpbCell(d.cpbY[0]||0), cpbCell(d.cpbY[1]||0), cpbCell(d.cpbY[2]||0), cpbCell(d.cpbAvg), cpbCell(d.cpbAvg)]);
-  if(logSet.size>0) sumData.push([cpbCell(`CPB excl. ${[...logSet].join(' + ')}`), '', cpbCell(d.cpbExclY[0]||0), cpbCell(d.cpbExclY[1]||0), cpbCell(d.cpbExclY[2]||0), cpbCell(d.cpbExclAvg), cpbCell(d.cpbExclAvg)]);
+
+  // Total costs — bold teal highlight
+  sumData.push([
+    totalCell('Total costs',false), totalCell('',false),
+    totalCell(d.totY.y1,true), totalCell(d.totY.y2||0,true), totalCell(d.totY.y3||0,true),
+    totalCell(d.avgCost,true), totalCell(d.totalAll,true)
+  ]);
+
+  // Beneficiaries repeat for reference
+  sumData.push([
+    txtCell('Beneficiaries',true), txtCell(''),
+    numCell(Math.round(d.b1)), numCell(Math.round(d.b2||0)), numCell(Math.round(d.b3||0)),
+    numCell(Math.round(d.totalBen/NY)), numCell(Math.round(d.totalBen))
+  ]);
+
+  // Cost per beneficiary — red highlight
+  sumData.push([
+    cpbCell('Cost per beneficiary (avg)'), txtCell(''),
+    cpbCell(d.cpbY[0]||0), cpbCell(d.cpbY[1]||0), cpbCell(d.cpbY[2]||0),
+    cpbCell(d.cpbAvg), cpbCell(d.cpbAvg)
+  ]);
+
+  // CPB excl logistics if applicable
+  if(logSet.size>0) {
+    sumData.push([
+      cpbCell(`CPB excl. ${[...logSet].join(' + ')}`), txtCell(''),
+      cpbCell(d.cpbExclY[0]||0), cpbCell(d.cpbExclY[1]||0), cpbCell(d.cpbExclY[2]||0),
+      cpbCell(d.cpbExclAvg), cpbCell(d.cpbExclAvg)
+    ]);
+  }
 
   const sumWS = XLSX.utils.aoa_to_sheet(sumData);
   setColWidths(sumWS, [24,30,16,16,16,16,16]);
@@ -981,7 +1049,7 @@ function dlXLSX() {
   ccData.push([]);
   ccData.push([
     totalCell('TOTALS',false),'','','','','','','',
-    totalCell(d.totY.y1,true), totalCell(d.totY.y2,true), totalCell(d.totY.y3,true)
+    totalCell(d.totY.y1,true), totalCell(d.totY.y2||0,true), totalCell(d.totY.y3||0,true)
   ]);
 
   const ccWS = XLSX.utils.aoa_to_sheet(ccData);
@@ -995,8 +1063,8 @@ function dlXLSX() {
   benData.push([titleCell('BENEFICIARY CALCULATIONS')]);
   benData.push([]);
   benData.push([subHdrCell('Year 1'), numCell(Math.round(d.b1))]);
-  benData.push([subHdrCell('Year 2'), numCell(Math.round(d.b2))]);
-  benData.push([subHdrCell('Year 3'), numCell(Math.round(d.b3))]);
+  benData.push([subHdrCell('Year 2'), numCell(Math.round(d.b2||0))]);
+  benData.push([subHdrCell('Year 3'), numCell(Math.round(d.b3||0))]);
   benData.push([]);
   benData.push([totalCell('Total',false), totalCell(Math.round(d.totalBen),true)]);
   benData.push([]);
@@ -1029,7 +1097,6 @@ function dlXLSX() {
 
   XLSX.writeFile(WB, `BOTEC_${pn.replace(/\s+/g,'_')}.xlsx`);
 }
-
 // ── M&E helpers ───────────────────────────────────────────────
 function addMaeHelper(id, d = {}, type = 'nabl') {
   const existing = document.getElementById('mh'+id);
