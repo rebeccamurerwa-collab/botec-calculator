@@ -446,13 +446,42 @@ function getBenTotals() {
 }
 
 // ── Atta consumption calculator ───────────────────────────────
+// ── Atta programme presets ───────────────────────────────────
+function applyAttaPreset() {
+  const type = document.getElementById('atta-programme-type')?.value;
+  const presets = {
+    mdm:    { gpd:125, sdm:16,  ratio:5, label:'MDM: 125g · 16 days/month · 1:5 ratio' },
+    twh:    { gpd:250, sdm:26,  ratio:5, label:'Tribal Welfare Hostel: 250g · 26 days/month · 1:5 ratio' },
+    pds:    { gpd:417, sdm:30,  ratio:5, label:'PDS: 417g · 30 days/month · 1:5 ratio' },
+    custom: { label:'Custom — edit fields as needed' }
+  };
+  const p = presets[type];
+  if (!p) return;
+  if (type !== 'custom') {
+    const gpd   = document.getElementById('atta-gpd');
+    const sdm   = document.getElementById('atta-sdm');
+    const ratio = document.getElementById('atta-ratio');
+    if (gpd)   gpd.value   = p.gpd;
+    if (sdm)   sdm.value   = p.sdm;
+    if (ratio) ratio.value = p.ratio;
+  }
+  const lbl = document.getElementById('atta-preset-label');
+  if (lbl) lbl.textContent = p.label;
+  calcAtta();
+}
+
 function calcAtta() {
   const { b1, b2, b3 } = getBenTotals();
   const NY = parseInt(v('numYears')) || 3;
 
+  // Read editable assumptions — fall back to MDM defaults
+  const gpd   = parseFloat(document.getElementById('atta-gpd')?.value)   || 125;
+  const sdm   = parseFloat(document.getElementById('atta-sdm')?.value)   || 16;
+  const ratio = parseFloat(document.getElementById('atta-ratio')?.value) || 5;
+
   const calcYear = ben => {
-    const daily   = ben * 125 / 1e6;
-    const monthly = daily * 16;
+    const daily   = ben * gpd / 1e6;
+    const monthly = daily * sdm;
     const yearMT  = monthly * 12;
     const yearKG  = yearMT * 1000;
     return { daily, monthly, yearMT, yearKG };
@@ -478,9 +507,10 @@ function calcAtta() {
   if (el('atta-yearly-3'))  el('atta-yearly-3').textContent  = NY>=3 ? fmtMT(a3.yearMT)  : '—';
   if (el('atta-kg-3'))      el('atta-kg-3').textContent      = NY>=3 ? fmtKG(a3.yearKG)  : '—';
 
-  if (el('atta-premix-1')) el('atta-premix-1').textContent = a1.yearMT>0?(a1.yearMT/5).toFixed(0)+' KG':'—';
-  if (el('atta-premix-2')) el('atta-premix-2').textContent = a2.yearMT>0?(a2.yearMT/5).toFixed(0)+' KG':'—';
-  if (el('atta-premix-3')) el('atta-premix-3').textContent = a3.yearMT>0?(a3.yearMT/5).toFixed(0)+' KG':'—';
+  const ratioVal = parseFloat(document.getElementById('atta-ratio')?.value) || 5;
+  if (el('atta-premix-1')) el('atta-premix-1').textContent = a1.yearMT>0?(a1.yearMT/ratioVal).toFixed(0)+' KG':'—';
+  if (el('atta-premix-2')) el('atta-premix-2').textContent = a2.yearMT>0?(a2.yearMT/ratioVal).toFixed(0)+' KG':'—';
+  if (el('atta-premix-3')) el('atta-premix-3').textContent = a3.yearMT>0?(a3.yearMT/ratioVal).toFixed(0)+' KG':'—';
 
   updateAttaRows();
 }
@@ -493,7 +523,8 @@ function updateAttaRows() {
     const u2   = document.getElementById('u2_'+id);
     const u3   = document.getElementById('u3_'+id);
     let v1=0, v2=0, v3=0;
-    if (type === 'premix') { v1=lastAtta.mt1/5; v2=lastAtta.mt2/5; v3=lastAtta.mt3/5; }
+    const ratioForRow = parseFloat(document.getElementById('atta-ratio')?.value) || 5;
+    if (type === 'premix') { v1=lastAtta.mt1/ratioForRow; v2=lastAtta.mt2/ratioForRow; v3=lastAtta.mt3/ratioForRow; }
     else                   { v1=lastAtta.kg1;   v2=lastAtta.kg2;   v3=lastAtta.kg3;   }
     if (u1) u1.value = v1 > 0 ? Math.round(v1) : '';
     if (u2) u2.value = v2 > 0 ? Math.round(v2) : '';
@@ -627,10 +658,15 @@ function addTravelHelper(id, d = {}) {
   const tr2     = document.createElement('tr');
   tr2.id        = 'th' + id;
   tr2.className = 'helper-row';
-  const people = d.tPeople != null ? d.tPeople : '';
-  const m1 = d.tM1 != null ? d.tM1 : '';
-  const m2 = d.tM2 != null ? d.tM2 : '';
-  const m3 = d.tM3 != null ? d.tM3 : '';
+  const people  = d.tPeople  != null ? d.tPeople  : '';
+  const m1      = d.tM1      != null ? d.tM1      : '';
+  const m2      = d.tM2      != null ? d.tM2      : '';
+  const m3      = d.tM3      != null ? d.tM3      : '';
+  const dpr     = d.tDayRate != null ? d.tDayRate : '';
+  const td1     = d.tDays1   != null ? d.tDays1   : '';
+  const td2     = d.tDays2   != null ? d.tDays2   : '';
+  const td3     = d.tDays3   != null ? d.tDays3   : '';
+
   tr2.innerHTML = `<td colspan="12" class="helper-cell">
     <div class="helper-inner">
       <div class="helper-toggle" onclick="toggleHelper('tbody_${id}')">
@@ -638,47 +674,112 @@ function addTravelHelper(id, d = {}) {
         <span class="helper-chevron" id="tchev_${id}">▾</span>
       </div>
       <div id="tbody_${id}">
-      <div class="helper-rows">
-        <div class="helper-person-row">
-          <span class="helper-field-lbl">Number of people travelling</span>
-          <input type="number" id="tPpl_${id}" value="${people}" placeholder="e.g. 2" style="width:70px" oninput="calcTravelRow(${id})">
-          <span class="helper-fixed" style="margin-left:4px">(same across all years)</span>
+      <div class="helper-fixed" style="margin-bottom:8px">
+        <strong>Person-month</strong> = the cost of one person travelling for one month.
+        Use the <em>months calculator</em> if you think in months, or the <em>days converter</em>
+        if you have a number of travel days — it will convert to person-months automatically (÷ 22 working days).
+      </div>
+
+      <div style="display:flex;gap:24px;flex-wrap:wrap">
+        <!-- Left: months calculator (existing) -->
+        <div style="flex:1;min-width:260px">
+          <div class="helper-field-lbl" style="font-weight:600;margin-bottom:6px">Option A — enter months directly</div>
+          <div class="helper-rows">
+            <div class="helper-person-row">
+              <span class="helper-field-lbl">Number of people travelling</span>
+              <input type="number" id="tPpl_${id}" value="${people}" placeholder="e.g. 2" style="width:70px" oninput="calcTravelRow(${id})">
+            </div>
+            <div class="helper-year-row">
+              <span class="hyr-lbl">Year 1</span>
+              <input type="number" id="tM1_${id}" value="${m1}" placeholder="months" style="width:80px" oninput="calcTravelRow(${id})">
+              <span class="hyr-sep">months × people</span>
+              <span class="hyr-result" id="tR1_${id}">= — person-months</span>
+            </div>
+            <div class="helper-year-row">
+              <span class="hyr-lbl">Year 2</span>
+              <input type="number" id="tM2_${id}" value="${m2}" placeholder="months" style="width:80px" oninput="calcTravelRow(${id})">
+              <span class="hyr-sep">months × people</span>
+              <span class="hyr-result" id="tR2_${id}">= — person-months</span>
+            </div>
+            <div class="helper-year-row">
+              <span class="hyr-lbl">Year 3</span>
+              <input type="number" id="tM3_${id}" value="${m3}" placeholder="months" style="width:80px" oninput="calcTravelRow(${id})">
+              <span class="hyr-sep">months × people</span>
+              <span class="hyr-result" id="tR3_${id}">= — person-months</span>
+            </div>
+          </div>
         </div>
-        <div class="helper-year-row">
-          <span class="hyr-lbl">Year 1</span>
-          <input type="number" id="tM1_${id}" value="${m1}" placeholder="months" style="width:80px" oninput="calcTravelRow(${id})">
-          <span class="hyr-sep">months travelling × people</span>
-          <span class="hyr-result" id="tR1_${id}">= — person-months</span>
-        </div>
-        <div class="helper-year-row">
-          <span class="hyr-lbl">Year 2</span>
-          <input type="number" id="tM2_${id}" value="${m2}" placeholder="months" style="width:80px" oninput="calcTravelRow(${id})">
-          <span class="hyr-sep">months travelling × people</span>
-          <span class="hyr-result" id="tR2_${id}">= — person-months</span>
-        </div>
-        <div class="helper-year-row">
-          <span class="hyr-lbl">Year 3</span>
-          <input type="number" id="tM3_${id}" value="${m3}" placeholder="months" style="width:80px" oninput="calcTravelRow(${id})">
-          <span class="hyr-sep">months travelling × people</span>
-          <span class="hyr-result" id="tR3_${id}">= — person-months</span>
+
+        <!-- Right: days converter -->
+        <div style="flex:1;min-width:260px;border-left:0.5px solid var(--border);padding-left:20px">
+          <div class="helper-field-lbl" style="font-weight:600;margin-bottom:6px">Option B — convert from days of travel</div>
+          <div class="helper-rows">
+            <div class="helper-person-row">
+              <span class="helper-field-lbl">Daily rate (₹/day)</span>
+              <input type="number" id="tDayRate_${id}" value="${dpr}" placeholder="e.g. 1136" style="width:90px" oninput="calcTravelDays(${id})">
+              <span class="helper-fixed" style="margin-left:6px">÷ 22 working days = monthly rate</span>
+            </div>
+            <div class="helper-year-row">
+              <span class="hyr-lbl">Year 1</span>
+              <input type="number" id="tDays1_${id}" value="${td1}" placeholder="days" style="width:70px" oninput="calcTravelDays(${id})">
+              <span class="hyr-sep">days × people ÷ 22</span>
+              <span class="hyr-result" id="tDR1_${id}">= — person-months</span>
+            </div>
+            <div class="helper-year-row">
+              <span class="hyr-lbl">Year 2</span>
+              <input type="number" id="tDays2_${id}" value="${td2}" placeholder="days" style="width:70px" oninput="calcTravelDays(${id})">
+              <span class="hyr-sep">days × people ÷ 22</span>
+              <span class="hyr-result" id="tDR2_${id}">= — person-months</span>
+            </div>
+            <div class="helper-year-row">
+              <span class="hyr-lbl">Year 3</span>
+              <input type="number" id="tDays3_${id}" value="${td3}" placeholder="days" style="width:70px" oninput="calcTravelDays(${id})">
+              <span class="hyr-sep">days × people ÷ 22</span>
+              <span class="hyr-result" id="tDR3_${id}">= — person-months</span>
+            </div>
+          </div>
+          <div class="helper-hint">Filling in Option B will update the monthly cost/unit field and the units above automatically.</div>
         </div>
       </div>
-      <div class="helper-hint">Units above are filled in automatically. You can still type directly to override.</div>
       </div>
     </div></td>`;
   document.getElementById('cr'+id).insertAdjacentElement('afterend', tr2);
   if (m1 || m2 || m3) calcTravelRow(id);
+  if (td1 || td2 || td3) calcTravelDays(id);
 }
 
 function calcTravelRow(id) {
   const ppl = parseFloat(document.getElementById('tPpl_'+id)?.value) || 0;
   [1,2,3].forEach(y => {
     const m     = parseFloat(document.getElementById(`tM${y}_${id}`)?.value) || 0;
-    const units = m * ppl;
+    const units = parseFloat((m * ppl).toFixed(2));
     const res   = document.getElementById(`tR${y}_${id}`);
     if (res) res.textContent = m > 0 ? `= ${units} person-months` : '= —';
     const uEl   = document.getElementById(`u${y}_${id}`);
     if (uEl) uEl.value = units || '';
+  });
+  const mainRow = document.getElementById('cr'+id);
+  if (mainRow) updateCostRow(mainRow.querySelector('input[type=number]'));
+  calcAll();
+}
+
+function calcTravelDays(id) {
+  const dayRate = parseFloat(document.getElementById(`tDayRate_${id}`)?.value) || 0;
+  const ppl     = parseFloat(document.getElementById(`tPpl_${id}`)?.value) || 1;
+  // Update the monthly cost/unit field from daily rate
+  if (dayRate > 0) {
+    const monthlyRate = parseFloat((dayRate * 22).toFixed(0));
+    const cpuEl = document.getElementById('cr'+id)?.querySelector('input[type=number]');
+    if (cpuEl) { cpuEl.value = monthlyRate; }
+  }
+  [1,2,3].forEach(y => {
+    const days  = parseFloat(document.getElementById(`tDays${y}_${id}`)?.value) || 0;
+    const units = parseFloat(((days * ppl) / 22).toFixed(2));
+    const res   = document.getElementById(`tDR${y}_${id}`);
+    if (res) res.textContent = days > 0 ? `= ${units} person-months` : '= —';
+    // Also fill the units fields
+    const uEl = document.getElementById(`u${y}_${id}`);
+    if (uEl && days > 0) uEl.value = units || '';
   });
   const mainRow = document.getElementById('cr'+id);
   if (mainRow) updateCostRow(mainRow.querySelector('input[type=number]'));
@@ -755,7 +856,12 @@ function getCostData() {
         maeMonths: document.getElementById('mae_months_'+id)?.value
       }),
       ...(hPpl!=null && {hPeople:hPpl, hHrs1:hH1, hHrs2:hH2, hHrs3:hH3}),
-      ...(tPpl!=null && {tPeople:tPpl, tM1, tM2, tM3}),
+      ...(tPpl!=null && {tPeople:tPpl, tM1, tM2, tM3,
+        tDayRate: document.getElementById('tDayRate_'+id)?.value,
+        tDays1:   document.getElementById('tDays1_'+id)?.value,
+        tDays2:   document.getElementById('tDays2_'+id)?.value,
+        tDays3:   document.getElementById('tDays3_'+id)?.value,
+      }),
     };
   });
 }
@@ -866,233 +972,97 @@ function dlXLSX() {
   calcAll(); const d=lastCalc;
   const WB=XLSX.utils.book_new(), pn=v('projName')||'BOTEC', cur=v('currency'), NY=d.NY||3;
   const s=getSym();
-
-  function hdrCell(val) {
-    return { v:val, t:'s', s:{
-      font:{name:'Calibri',sz:10,bold:true,color:{rgb:'FFFFFF'}},
-      fill:{fgColor:{rgb:'006064'}},
-      alignment:{horizontal:'center',vertical:'center',wrapText:true}
-    }};
-  }
-  function titleCell(val) {
-    return { v:val, t:'s', s:{
-      font:{name:'Calibri',sz:10,bold:true,color:{rgb:'006064'}},
-      alignment:{vertical:'center'}
-    }};
-  }
-  function subHdrCell(val) {
-    return { v:val, t:'s', s:{
-      font:{name:'Calibri',sz:10,bold:true,color:{rgb:'004D40'}},
-      fill:{fgColor:{rgb:'E0F7FA'}},
-      alignment:{vertical:'center',wrapText:true}
-    }};
-  }
-  function totalCell(val, isNum) {
-    return { v:val||(isNum?0:''), t:isNum?'n':'s', s:{
-      font:{name:'Calibri',sz:10,bold:true},
-      fill:{fgColor:{rgb:'B2EBF2'}},
-      numFmt: isNum ? `"${s}"#,##0` : undefined,
-      alignment:{horizontal:isNum?'right':'left',vertical:'top'}
-    }};
-  }
-  function cpbCell(val) {
-    return { v:typeof val==='number'?val:0, t:'n', s:{
-      font:{name:'Calibri',sz:10,bold:true,color:{rgb:'B71C1C'}},
-      fill:{fgColor:{rgb:'FFEBEE'}},
-      numFmt:`"${s}"0.00`,
-      alignment:{horizontal:'right',vertical:'top'}
-    }};
-  }
-  function numCell(val) {
-    return { v:val||0, t:'n', s:{
-      font:{name:'Calibri',sz:10},
-      numFmt:`"${s}"#,##0`,
-      alignment:{horizontal:'right',vertical:'top'}
-    }};
-  }
-  function txtCell(val, bold) {
-    return { v:val||'', t:'s', s:{
-      font:{name:'Calibri',sz:10,bold:!!bold},
-      alignment:{vertical:'top',wrapText:true}
-    }};
-  }
-  function noteCell(val) {
-    return { v:val||'', t:'s', s:{
-      font:{name:'Calibri',sz:10,color:{rgb:'555555'},italic:true},
-      alignment:{vertical:'top',wrapText:true}
-    }};
-  }
-  function altCell(val, isNum, rowIdx) {
-    const bg = rowIdx%2===0 ? 'F5F5F5' : 'FFFFFF';
-    return { v:val||(isNum?0:''), t:isNum?'n':'s', s:{
-      font:{name:'Calibri',sz:10},
-      fill:{fgColor:{rgb:bg}},
-      numFmt: isNum ? `"${s}"#,##0` : undefined,
-      alignment:{horizontal:isNum?'right':'left',vertical:'top',wrapText:true}
-    }};
-  }
-  function setColWidths(ws, widths) { ws['!cols'] = widths.map(w=>({wch:w})); }
-  function setRowHeight(ws, row, height) { ws['!rows']=ws['!rows']||[]; ws['!rows'][row]={hpt:height}; }
-
+  const n0 = n => Math.round(n);
+  const n2 = n => parseFloat((n||0).toFixed(2));
   const yrs = Array.from({length:NY},(_,i)=>`Year ${i+1}`);
   const ah  = HEADS.filter(h=>d.byHead[h]&&d.byHead[h].y1+d.byHead[h].y2+d.byHead[h].y3>0);
 
   // ── SUMMARY SHEET ─────────────────────────────────────────────
-  const sumData = [];
-  sumData.push([titleCell('COST PER BENEFICIARY ESTIMATE')]);
-  sumData.push([]);
-  sumData.push([subHdrCell('Project:'),           txtCell(pn, true)]);
-  sumData.push([subHdrCell('Prepared by:'),       txtCell(v('prepBy'))]);
-  sumData.push([subHdrCell('Preparation date:'),  txtCell(v('prepDate'))]);
-  sumData.push([subHdrCell('Reviewed by:'),       txtCell(v('reviewBy'))]);
-  sumData.push([subHdrCell('Review date:'),       txtCell(v('reviewDate'))]);
-  sumData.push([subHdrCell('Programme / state:'), txtCell(v('programme'))]);
-  sumData.push([]);
+  const sum = [];
+  sum.push(['COST PER BENEFICIARY ESTIMATE']);
+  sum.push([]);
+  sum.push(['Project:', pn]);
+  sum.push(['Prepared by:', v('prepBy')]);
+  sum.push(['Preparation date:', v('prepDate')]);
+  sum.push(['Reviewed by:', v('reviewBy')]);
+  sum.push(['Review date:', v('reviewDate')]);
+  sum.push(['Programme / state:', v('programme')]);
+  sum.push([]);
+  sum.push(['', ...yrs, 'Average / yr', `${NY}-yr Total`]);
+  sum.push(['BENEFICIARIES', n0(d.b1), NY>=2?n0(d.b2):'', NY>=3?n0(d.b3):'', n0(d.totalBen/NY), n0(d.totalBen)]);
+  sum.push([]);
+  sum.push(['COSTS ('+cur+')', ...yrs, 'Average / yr', `${NY}-yr Total`]);
 
-  // Column header row — bold teal
-  sumData.push([hdrCell(''), hdrCell('Cost head'), ...yrs.map(y=>hdrCell(y)), hdrCell('Average / yr'), hdrCell(`${NY}-yr Total`)]);
-
-  // Beneficiaries row
-  sumData.push([
-    subHdrCell('Beneficiaries'), txtCell(''),
-    numCell(Math.round(d.b1)),
-    NY>=2 ? numCell(Math.round(d.b2)) : txtCell(''),
-    NY>=3 ? numCell(Math.round(d.b3)) : txtCell(''),
-    numCell(Math.round(d.totalBen/NY)),
-    numCell(Math.round(d.totalBen))
-  ]);
-  sumData.push([]);
-  sumData.push([subHdrCell(`Costs (${cur})`), txtCell('')]);
-
-  // Cost head rows
-  let rIdx = 0;
   ah.forEach(h => {
-    const vv=d.byHead[h], vals=[vv.y1,vv.y2,vv.y3].slice(0,NY), t=vals.reduce((a,b)=>a+b,0);
-    const padded = [...vals];
-    while(padded.length < 3) padded.push(0);
-    sumData.push([altCell('',false,rIdx), altCell(h,false,rIdx), altCell(padded[0],true,rIdx), altCell(padded[1],true,rIdx), altCell(padded[2],true,rIdx), altCell(t/NY,true,rIdx), altCell(t,true,rIdx)]);
-    rIdx++;
+    const vv=d.byHead[h], vals=[vv.y1,vv.y2||0,vv.y3||0].slice(0,NY), t=vals.reduce((a,b)=>a+b,0);
+    const row = [h, ...vals];
+    while(row.length < 2+NY) row.push('');
+    row.push(n0(t/NY), n0(t));
+    sum.push(row);
   });
 
-  // Managerial multiplier
-  const mt=d.mgrVal.y1+d.mgrVal.y2+d.mgrVal.y3;
-  if(mt>0) {
-    sumData.push([txtCell(''), txtCell(`${(d.mgr*100).toFixed(0)}% managerial multiplier`,true),
-      numCell(d.mgrVal.y1), numCell(d.mgrVal.y2||0), numCell(d.mgrVal.y3||0),
-      numCell(mt/NY), numCell(mt)]);
-  }
+  const mt=d.mgrVal.y1+(d.mgrVal.y2||0)+(d.mgrVal.y3||0);
+  if(mt>0) sum.push([`${(d.mgr*100).toFixed(0)}% Managerial multiplier`, n0(d.mgrVal.y1), n0(d.mgrVal.y2||0), n0(d.mgrVal.y3||0), n0(mt/NY), n0(mt)].slice(0, 2+NY+2));
 
-  // Buffer
-  const bt=d.bufVal.y1+d.bufVal.y2+d.bufVal.y3;
-  if(bt>0) {
-    sumData.push([txtCell(''), txtCell(`${(d.buf*100).toFixed(0)}% buffer / contingency`,true),
-      numCell(d.bufVal.y1), numCell(d.bufVal.y2||0), numCell(d.bufVal.y3||0),
-      numCell(bt/NY), numCell(bt)]);
-  }
+  const bt=d.bufVal.y1+(d.bufVal.y2||0)+(d.bufVal.y3||0);
+  if(bt>0) sum.push([`${(d.buf*100).toFixed(0)}% Buffer / contingency`, n0(d.bufVal.y1), n0(d.bufVal.y2||0), n0(d.bufVal.y3||0), n0(bt/NY), n0(bt)].slice(0, 2+NY+2));
 
-  sumData.push([]);
-
-  // Total costs — bold teal highlight
-  sumData.push([
-    totalCell('Total costs',false), totalCell('',false),
-    totalCell(d.totY.y1,true), totalCell(d.totY.y2||0,true), totalCell(d.totY.y3||0,true),
-    totalCell(d.avgCost,true), totalCell(d.totalAll,true)
-  ]);
-
-  // Beneficiaries repeat for reference
-  sumData.push([
-    txtCell('Beneficiaries',true), txtCell(''),
-    numCell(Math.round(d.b1)), numCell(Math.round(d.b2||0)), numCell(Math.round(d.b3||0)),
-    numCell(Math.round(d.totalBen/NY)), numCell(Math.round(d.totalBen))
-  ]);
-
-  // Cost per beneficiary — red highlight
-  sumData.push([
-    cpbCell('Cost per beneficiary (avg)'), txtCell(''),
-    cpbCell(d.cpbY[0]||0), cpbCell(d.cpbY[1]||0), cpbCell(d.cpbY[2]||0),
-    cpbCell(d.cpbAvg), cpbCell(d.cpbAvg)
-  ]);
-
-  // CPB excl logistics if applicable
+  sum.push([]);
+  sum.push(['TOTAL COSTS', n0(d.totY.y1), n0(d.totY.y2||0), n0(d.totY.y3||0), n0(d.avgCost), n0(d.totalAll)].slice(0, 2+NY+2));
+  sum.push(['Beneficiaries', n0(d.b1), n0(d.b2||0), n0(d.b3||0), n0(d.totalBen/NY), n0(d.totalBen)].slice(0, 2+NY+2));
+  sum.push(['COST PER BENEFICIARY (avg)', n2(d.cpbY[0]||0), n2(d.cpbY[1]||0), n2(d.cpbY[2]||0), n2(d.cpbAvg), n2(d.cpbAvg)].slice(0, 2+NY+2));
   if(logSet.size>0) {
-    sumData.push([
-      cpbCell(`CPB excl. ${[...logSet].join(' + ')}`), txtCell(''),
-      cpbCell(d.cpbExclY[0]||0), cpbCell(d.cpbExclY[1]||0), cpbCell(d.cpbExclY[2]||0),
-      cpbCell(d.cpbExclAvg), cpbCell(d.cpbExclAvg)
-    ]);
+    sum.push([`CPB excl. ${[...logSet].join(' + ')}`, n2(d.cpbExclY[0]||0), n2(d.cpbExclY[1]||0), n2(d.cpbExclY[2]||0), n2(d.cpbExclAvg), n2(d.cpbExclAvg)].slice(0, 2+NY+2));
   }
 
-  const sumWS = XLSX.utils.aoa_to_sheet(sumData);
-  setColWidths(sumWS, [24,30,16,16,16,16,16]);
-  setRowHeight(sumWS, 0, 32);
-  setRowHeight(sumWS, 9, 30);
+  const sumWS = XLSX.utils.aoa_to_sheet(sum);
+  sumWS['!cols'] = [28,18,18,18,18,18].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(WB, sumWS, 'Summary');
 
   // ── COST CALCULATION SHEET ────────────────────────────────────
-  const ccData = [];
-  ccData.push([titleCell('COST CALCULATION')]);
-  ccData.push([]);
-  ccData.push([
-    hdrCell('Cost Head'), hdrCell('Description'), hdrCell('Notes / Justification'),
-    hdrCell('Unit'), hdrCell(`Monthly Cost/Unit (${cur})`),
-    hdrCell('Units Y1'), hdrCell('Units Y2'), hdrCell('Units Y3'),
-    hdrCell(`Cost Y1 (${cur})`), hdrCell(`Cost Y2 (${cur})`), hdrCell(`Cost Y3 (${cur})`)
-  ]);
-  d.rows.forEach((r,i) => {
-    ccData.push([
-      altCell(r.head,false,i), altCell(r.desc,false,i), noteCell(r.justif||''),
-      altCell(r.unit,false,i), altCell(r.cpu,true,i),
-      altCell(r.u1,true,i), altCell(r.u2,true,i), altCell(r.u3,true,i),
-      altCell(r.cy1,true,i), altCell(r.cy2,true,i), altCell(r.cy3,true,i)
-    ]);
+  const cc = [];
+  cc.push(['COST CALCULATION']);
+  cc.push([]);
+  cc.push(['COST HEAD','DESCRIPTION','NOTES / JUSTIFICATION','UNIT',`MONTHLY COST/UNIT (${cur})`,'UNITS Y1','UNITS Y2','UNITS Y3',`COST Y1 (${cur})`,`COST Y2 (${cur})`,`COST Y3 (${cur})`]);
+  d.rows.forEach(r => {
+    cc.push([r.head, r.desc, r.justif||'', r.unit, r.cpu, r.u1||0, r.u2||0, r.u3||0, n0(r.cy1), n0(r.cy2), n0(r.cy3)]);
   });
-  ccData.push([]);
-  ccData.push([
-    totalCell('TOTALS',false),'','','','','','','',
-    totalCell(d.totY.y1,true), totalCell(d.totY.y2||0,true), totalCell(d.totY.y3||0,true)
-  ]);
+  cc.push([]);
+  cc.push(['TOTALS','','','','','','','', n0(d.totY.y1), n0(d.totY.y2||0), n0(d.totY.y3||0)]);
 
-  const ccWS = XLSX.utils.aoa_to_sheet(ccData);
-  setColWidths(ccWS, [22,26,34,14,18,10,10,10,16,16,16]);
-  setRowHeight(ccWS, 0, 28);
-  setRowHeight(ccWS, 2, 38);
+  const ccWS = XLSX.utils.aoa_to_sheet(cc);
+  ccWS['!cols'] = [22,26,34,14,18,10,10,10,16,16,16].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(WB, ccWS, 'Cost Calculation');
 
   // ── BENEFICIARY SHEET ─────────────────────────────────────────
-  const benData = [];
-  benData.push([titleCell('BENEFICIARY CALCULATIONS')]);
-  benData.push([]);
-  benData.push([subHdrCell('Year 1'), numCell(Math.round(d.b1))]);
-  benData.push([subHdrCell('Year 2'), numCell(Math.round(d.b2||0))]);
-  benData.push([subHdrCell('Year 3'), numCell(Math.round(d.b3||0))]);
-  benData.push([]);
-  benData.push([totalCell('Total',false), totalCell(Math.round(d.totalBen),true)]);
-  benData.push([]);
-  benData.push([subHdrCell('Notes / source'), noteCell(v('benNotes'))]);
+  const ben = [];
+  ben.push(['BENEFICIARY CALCULATIONS']);
+  ben.push([]);
+  ben.push(['Year 1', n0(d.b1)]);
+  if(NY>=2) ben.push(['Year 2', n0(d.b2||0)]);
+  if(NY>=3) ben.push(['Year 3', n0(d.b3||0)]);
+  ben.push([]);
+  ben.push(['TOTAL', n0(d.totalBen)]);
+  ben.push([]);
+  ben.push(['Notes / source', v('benNotes')]);
 
-  const benWS = XLSX.utils.aoa_to_sheet(benData);
-  setColWidths(benWS, [22,22]);
-  setRowHeight(benWS, 0, 28);
+  const benWS = XLSX.utils.aoa_to_sheet(ben);
+  benWS['!cols'] = [22,22].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(WB, benWS, 'Beneficiary Calculation');
 
   // ── UNIT COSTS SHEET ──────────────────────────────────────────
-  const ucData = [];
-  ucData.push([titleCell('UNIT COSTS')]);
-  ucData.push([]);
-  ucData.push([hdrCell('Cost Head'), hdrCell('Description'), hdrCell(`Monthly Cost/Unit (${cur})`), hdrCell('Unit')]);
+  const uc = [];
+  uc.push(['UNIT COSTS']);
+  uc.push([]);
+  uc.push(['COST HEAD','DESCRIPTION',`MONTHLY COST/UNIT (${cur})`,'UNIT']);
   const seen = new Set();
-  d.rows.forEach((r,i) => {
+  d.rows.forEach(r => {
     const k = r.head+'|'+r.desc;
-    if (!seen.has(k)) {
-      seen.add(k);
-      ucData.push([altCell(r.head,false,i), altCell(r.desc,false,i), altCell(r.cpu,true,i), altCell(r.unit,false,i)]);
-    }
+    if(!seen.has(k)){ seen.add(k); uc.push([r.head, r.desc, r.cpu, r.unit]); }
   });
 
-  const ucWS = XLSX.utils.aoa_to_sheet(ucData);
-  setColWidths(ucWS, [24,30,22,16]);
-  setRowHeight(ucWS, 0, 28);
-  setRowHeight(ucWS, 2, 32);
+  const ucWS = XLSX.utils.aoa_to_sheet(uc);
+  ucWS['!cols'] = [24,30,22,16].map(w=>({wch:w}));
   XLSX.utils.book_append_sheet(WB, ucWS, 'Unit Costs');
 
   XLSX.writeFile(WB, `BOTEC_${pn.replace(/\s+/g,'_')}.xlsx`);
