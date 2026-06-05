@@ -11,11 +11,11 @@ const PRESETS = {
   c3:        { h:'Internal Consulting', d:'Senior Programs Officer',       u:'Person-month', cpu:85000,  consulting:true,
                guide:'Hours/month varies by year. Fill in the hours calculator below.' },
   travel:    { h:'Travel Costs',        d:'Travel Partnerships Manager',   u:'Person-month', cpu:25000,  travelRow:true,
-               guide:'1 person-month = 1 person travelling for 1 full month (~22 working days). If you have days of travel, use Option B in the helper below to convert automatically.' },
+               guide:'1 person-month = 1 person travelling for 1 full month (~22 working days). Enter the number of people travelling and months per year in the helper below — units are calculated as months × people. If you have days of travel instead, use Option B to convert automatically.' },
   travel2:   { h:'Travel Costs',        d:'Travel Senior Partnerships Officer', u:'Person-month', cpu:15000, travelRow:true,
-               guide:'1 person-month = 1 person travelling for 1 full month (~22 working days). If you have days of travel, use Option B in the helper below to convert automatically.' },
+               guide:'1 person-month = 1 person travelling for 1 full month (~22 working days). Enter the number of people travelling and months per year in the helper below — units are calculated as months × people. If you have days of travel instead, use Option B to convert automatically.' },
   travel3:   { h:'Travel Costs',        d:'Travel Senior Programs Officer',u:'Person-month', cpu:15000,  travelRow:true,
-               guide:'1 person-month = 1 person travelling for 1 full month (~22 working days). If you have days of travel, use Option B in the helper below to convert automatically.' },
+               guide:'1 person-month = 1 person travelling for 1 full month (~22 working days). Enter the number of people travelling and months per year in the helper below — units are calculated as months × people. If you have days of travel instead, use Option B to convert automatically.' },
   premix:    { h:'Premix Costs',        d:'NaFeEDTA premix',               u:'KG',           cpu:400,    attaType:'premix',
                guide:'Auto-calculated from atta consumption (yearly MT ÷ 5). Ratio of premix to flour is 1:5.' },
   equip:     { h:'Equipment Costs',     d:'Microdoser',                    u:'Device',       cpu:200000 },
@@ -639,6 +639,7 @@ function addTravelHelper(id, d = {}) {
   const m2      = d.tM2      != null ? d.tM2      : '';
   const m3      = d.tM3      != null ? d.tM3      : '';
   const dpr     = d.tDayRate != null ? d.tDayRate : '';
+  const tdppl   = d.tDayPpl  != null ? d.tDayPpl  : '';
   const td1     = d.tDays1   != null ? d.tDays1   : '';
   const td2     = d.tDays2   != null ? d.tDays2   : '';
   const td3     = d.tDays3   != null ? d.tDays3   : '';
@@ -691,6 +692,11 @@ function addTravelHelper(id, d = {}) {
           <div class="helper-field-lbl" style="font-weight:600;margin-bottom:6px">Option B — convert from days of travel</div>
           <div class="helper-rows">
             <div class="helper-person-row">
+              <span class="helper-field-lbl">Number of people travelling</span>
+              <input type="number" id="tDayPpl_${id}" value="${tdppl||people}" placeholder="e.g. 2" style="width:70px" oninput="calcTravelDays(${id})">
+              <span class="helper-fixed" style="margin-left:4px">(same across all years)</span>
+            </div>
+            <div class="helper-person-row">
               <span class="helper-field-lbl">Daily rate (₹/day)</span>
               <input type="number" id="tDayRate_${id}" value="${dpr}" placeholder="e.g. 1136" style="width:90px" oninput="calcTravelDays(${id})">
               <span class="helper-fixed" style="margin-left:6px">÷ 22 working days = monthly rate</span>
@@ -741,7 +747,7 @@ function calcTravelRow(id) {
 
 function calcTravelDays(id) {
   const dayRate = parseFloat(document.getElementById(`tDayRate_${id}`)?.value) || 0;
-  const ppl     = parseFloat(document.getElementById(`tPpl_${id}`)?.value) || 1;
+  const ppl     = parseFloat(document.getElementById(`tDayPpl_${id}`)?.value) || parseFloat(document.getElementById(`tPpl_${id}`)?.value) || 1;
   // Update the monthly cost/unit field from daily rate
   if (dayRate > 0) {
     const monthlyRate = parseFloat((dayRate * 22).toFixed(0));
@@ -833,6 +839,7 @@ function getCostData() {
       }),
       ...(hPpl!=null && {hPeople:hPpl, hHrs1:hH1, hHrs2:hH2, hHrs3:hH3}),
       ...(tPpl!=null && {tPeople:tPpl, tM1, tM2, tM3,
+        tDayPpl:  document.getElementById('tDayPpl_'+id)?.value,
         tDayRate: document.getElementById('tDayRate_'+id)?.value,
         tDays1:   document.getElementById('tDays1_'+id)?.value,
         tDays2:   document.getElementById('tDays2_'+id)?.value,
