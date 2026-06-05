@@ -287,16 +287,6 @@
           <span id="atta-chev" style="margin-left:auto;font-size:13px;color:#0097a7">▾</span>
         </div>
         <div id="atta-body">
-          <!-- Programme type preset dropdown -->
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-            <label style="font-size:13px;font-weight:500;color:var(--text2);white-space:nowrap">Programme type:</label>
-            <select id="atta-programme-type" style="width:260px;font-size:13px" onchange="applyAttaPreset()">
-              <option value="mdm">MDM / PM-POSHAN (school meals)</option>
-              <option value="twh">Tribal Welfare Hostel (2 meals/day)</option>
-              <option value="pds">PDS (take-home ration)</option>
-              <option value="custom">Custom — edit fields below</option>
-            </select>
-          </div>
           <div class="atta-assumptions" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
             <span style="font-size:12px;color:var(--text2)">Atta per person per day (g):</span>
             <input type="number" id="atta-gpd" value="125" style="width:70px;font-size:12px" oninput="calcAtta()">
@@ -304,7 +294,7 @@
             <input type="number" id="atta-sdm" value="16" style="width:60px;font-size:12px" oninput="calcAtta()">
             <span style="font-size:12px;color:var(--text2)">Premix : flour ratio (1 :)</span>
             <input type="number" id="atta-ratio" value="5" style="width:55px;font-size:12px" oninput="calcAtta()">
-            <span id="atta-preset-label" style="font-size:11px;color:#0097a7;font-style:italic">MDM: 125g · 16 days/month · 1:5 ratio</span>
+            <span style="font-size:11px;color:#0097a7;font-style:italic">Edit fields above to match your programme. E.g. for Tribal Welfare Hostels with 2 meals/day, double the grams per day.</span>
           </div>
           <div class="atta-grid">
             <div class="atta-col-hdr"></div>
