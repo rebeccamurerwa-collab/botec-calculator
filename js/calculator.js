@@ -446,30 +446,6 @@ function getBenTotals() {
 }
 
 // ── Atta consumption calculator ───────────────────────────────
-// ── Atta programme presets ───────────────────────────────────
-function applyAttaPreset() {
-  const type = document.getElementById('atta-programme-type')?.value;
-  const presets = {
-    mdm:    { gpd:125, sdm:16,  ratio:5, label:'MDM: 125g · 16 days/month · 1:5 ratio' },
-    twh:    { gpd:250, sdm:26,  ratio:5, label:'Tribal Welfare Hostel: 250g · 26 days/month · 1:5 ratio' },
-    pds:    { gpd:417, sdm:30,  ratio:5, label:'PDS: 417g · 30 days/month · 1:5 ratio' },
-    custom: { label:'Custom — edit fields as needed' }
-  };
-  const p = presets[type];
-  if (!p) return;
-  if (type !== 'custom') {
-    const gpd   = document.getElementById('atta-gpd');
-    const sdm   = document.getElementById('atta-sdm');
-    const ratio = document.getElementById('atta-ratio');
-    if (gpd)   gpd.value   = p.gpd;
-    if (sdm)   sdm.value   = p.sdm;
-    if (ratio) ratio.value = p.ratio;
-  }
-  const lbl = document.getElementById('atta-preset-label');
-  if (lbl) lbl.textContent = p.label;
-  calcAtta();
-}
-
 function calcAtta() {
   const { b1, b2, b3 } = getBenTotals();
   const NY = parseInt(v('numYears')) || 3;
